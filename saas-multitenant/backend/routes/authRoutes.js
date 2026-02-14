@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
+const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createUser } = require('../models/userModels');
 const { createTenant } = require('../models/tenantModels');
@@ -70,7 +70,7 @@ router.post('/login', async (req, res) => {
             }
 
             // Verifica senha
-            const isValidPassword = await bcrypt.compare(password, user.password_hash);
+            const isValidPassword = await bcryptjs.compare(password, user.password_hash);
             if (!isValidPassword) {
                 return res.status(401).json({ 
                     success: false,
@@ -89,9 +89,24 @@ router.post('/login', async (req, res) => {
                 { expiresIn: '30d' } // 30 dias
             );
 
+            // Enviar cookies HTTP-only junto com a resposta
+            res.cookie('auth-token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+            });
+            
+            res.cookie('tenant-id', user.tenant_id.toString(), {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+            });
+
             res.json({ 
                 success: true,
-                token,
+                token, // Mantém o token para fallback
                 user: { 
                     id: user.id, 
                     name: user.name, 
@@ -132,6 +147,13 @@ router.post('/validate', async (req, res) => {
     } catch (err) {
         res.status(401).json({ success: false, message: 'Token inválido' });
     }
+});
+
+// 4. LOGOUT - Limpar cookies
+router.post('/logout', async (req, res) => {
+    res.clearCookie('auth-token');
+    res.clearCookie('tenant-id');
+    res.json({ success: true, message: 'Logout realizado com sucesso' });
 });
 
 module.exports = router;
