@@ -1,0 +1,193 @@
+/* ================================
+   RESET GLOBAL
+================================ */
+
+html,
+body {
+  height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ================================
+   BODY + FUNDO GLOBAL
+================================ */
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+
+  background-image: url('/IMG/fundoCRM.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+
+  color: #111;
+  position: relative;
+}
+
+/* Overlay escuro para contraste */
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* React sempre acima do overlay */
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100%;
+}
+
+/* ================================
+   HEADER
+================================ */
+
+.app-header {
+  height: 56px;
+  background: #0f172a;
+  color: white;
+
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.header-left {
+  flex: 1;
+  font-weight: 600;
+}
+
+.header-right {
+  position: relative;
+}
+
+/* ================================
+   DROPDOWN DE MÓDULOS
+================================ */
+
+.module-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  background: white;
+  color: #090031;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(9, 0, 49, 0.35);
+
+  min-width: 180px;
+  padding: 6px;
+  z-index: 20;
+}
+
+.module-dropdown a {
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #090031;
+  font-weight: 500;
+}
+
+.module-dropdown a:hover {
+  background: #f1f5f9;
+}
+
+/* ================================
+   MARGEM GERAL DA PÁGINA
+================================ */
+
+.page-wrapper {
+  padding: 32px;
+}
+
+/* ================================
+   CONTAINER CENTRAL (CARD PRINCIPAL)
+================================ */
+
+.module-container {
+  max-width: 1200px;
+  margin: 0 auto;
+
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+
+  border-radius: 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+}
+
+/* ================================
+   LAYOUT PADRÃO DOS MÓDULOS
+================================ */
+
+.leads-layout {
+  display: flex;
+  min-height: 600px;
+}
+
+/* ================================
+   SIDEBAR DO MÓDULO
+================================ */
+
+.leads-sidebar {
+  width: 240px;
+  border-right: 1px solid #e5e7eb;
+  padding-right: 20px;
+}
+
+.module-title {
+  margin: 0 0 24px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* ================================
+   NAVEGAÇÃO DO MÓDULO
+================================ */
+
+.module-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.module-nav a {
+  padding: 10px 12px;
+  border-radius: 8px;
+
+  text-decoration: none;
+  color: #374151;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.module-nav a:hover {
+  background: #f1f5f9;
+}
+
+.module-nav a.active {
+  background: #e0e7ff;
+  color: #1e3a8a;
+}
+
+/* ================================
+   CONTEÚDO PRINCIPAL
+================================ */
+
+.leads-content {
+  flex: 1;
+  padding-left: 24px;
+}
