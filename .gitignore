@@ -1,0 +1,11 @@
+# dependências
+node_modules/
+**/node_modules/
+
+# variáveis de ambiente
+.env
+**/.env
+
+# builds
+dist/
+build/
