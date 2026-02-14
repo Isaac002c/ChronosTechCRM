@@ -27,17 +27,21 @@ export default function Header({ user, tenant, onLogout }) {
 
   return (
     <header className="global-header">
-      {/* Lado esquerdo - Logo e Nome */}
+      {/* Lado esquerdo - Logo */}
       <div className="header-left">
         <div className="header-logo">
-          <span className="logo-icon">◈</span>
-          <span className="logo-text">Chronos Tech</span>
+          <img 
+            src="/logoChronosTech.png" 
+            alt="ChronosTech" 
+            className="logo-image"
+          />
+          <span className="logo-text">ChronosTech</span>
         </div>
       </div>
 
       {/* Lado direito - Menu de Módulos */}
       <div className="header-right">
-        {/* Dropdown de Módulos */}
+        {/* Dropdown de Módulos */} 
         <div className="module-dropdown">
           <button 
             className="dropdown-trigger"
@@ -69,12 +73,8 @@ export default function Header({ user, tenant, onLogout }) {
           )}
         </div>
 
-        {/* Informações do Tenant e Usuário */}
+        {/* Informações do Usuário */}
         <div className="header-user-info">
-          <div className="tenant-badge">
-            <span className="tenant-icon">🏢</span>
-            {tenant?.name || 'Tenant'}
-          </div>
           <div className="user-avatar">
             {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>

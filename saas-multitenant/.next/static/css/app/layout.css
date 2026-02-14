@@ -106,7 +106,6 @@ a {
 .main-area {
   flex: 1 1;
   padding: 24px;
-  padding-top: 100px; /* Espaço para o header fixo */
   max-width: 1600px;
   margin: 0 auto;
   width: 100%;
@@ -117,11 +116,11 @@ a {
    ============================================ */
 
 .global-header {
-  position: fixed;
+  position: relative;
   top: 0;
   left: 0;
   right: 0;
-  height: 72px;
+  height: 160px;
   background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
   border-bottom: 1px solid #334155;
   display: flex;
@@ -129,8 +128,6 @@ a {
   justify-content: space-between;
   padding: 0 32px;
   z-index: 1000;
-  -webkit-backdrop-filter: blur(10px);
-          backdrop-filter: blur(10px);
 }
 
 .header-left {
@@ -141,7 +138,16 @@ a {
 .header-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0;
+}
+
+.logo-image {
+  height: 130px;
+  width: auto;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 8px;
+  margin-right: -5px;
 }
 
 .logo-icon {
@@ -151,10 +157,11 @@ a {
 }
 
 .logo-text {
-  font-size: 22px;
+  font-size: 42px;
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.5px;
+  background: transparent;
 }
 
 .header-right {
@@ -1648,10 +1655,15 @@ tr:last-child td {
 @media (max-width: 768px) {
   .global-header {
     padding: 0 16px;
+    height: 80px;
   }
   
   .header-logo .logo-text {
     display: none;
+  }
+
+  .logo-image {
+    height: 55px;
   }
   
   .tenant-badge {
@@ -1660,7 +1672,6 @@ tr:last-child td {
   
   .main-area {
     padding: 16px;
-    padding-top: 88px;
   }
   
   .module-container {

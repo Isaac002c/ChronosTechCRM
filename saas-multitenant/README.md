@@ -1,253 +1,126 @@
 # Chronos Tech CRM
 
-CRM SaaS multitenant desenvolvido do zero, com arquitetura pensada para escalar de MVP até produto profissional.
+CRM SaaS multitenant desenvolvido com Next.js 14 e Express.
 
 ---
 
 ##  Visão Geral
 
-O Chronos Tech CRM é dividido em **backend (Node.js)**, **banco de dados (PostgreSQL/Supabase)** e **frontend (React)**, seguindo separação clara de responsabilidades.
+O Chronos Tech CRM é um sistema CRM modular com arquitetura **multitenant**, permitindo que múltiplas empresas (tenants) utilizem a mesma instância do sistema com dados isolados.
 
-Objetivos principais:
+### Tecnologias
 
-* Multi-tenant (várias empresas usando o mesmo sistema)
-* Modular (Leads, Financeiro, Cyber, etc)
-* Arquitetura limpa e reutilizável
-* Pronto para evoluir para planos PRO
+- **Frontend**: Next.js 14 (App Router)
+- **Backend**: Node.js + Express
+- **Banco de Dados**: PostgreSQL (Supabase)
+- **Autenticação**: JWT com cookies
 
 ---
 
-##  Arquitetura Geral
+##  Estrutura do Projeto
 
 ```
-[ React (Frontend) ]
-        ↓ API REST / JWT
-[ Node.js + Express (Backend) ]
-        ↓
-[ PostgreSQL (Supabase) ]
-```
-
----
-
-##  Autenticação
-
-* Autenticação baseada em **JWT**
-* Token armazenado no `localStorage`
-* Rotas protegidas no frontend via `ProtectedRoute`
-* Backend valida token em middleware
-
----
-
-##  Banco de Dados (PostgreSQL / Supabase)
-
-### Conceitos principais
-
-* **Multi-tenant**: todas as tabelas possuem `tenant_id`
-* **Row Level Security (RLS)** habilitado
-* Policies garantem que um tenant não veja dados de outro
-
-### Tabelas principais (exemplo)
-
-* tenants
-* users
-* leads
-* lead_status
-* opportunities
-* sales
-
-Cada registro pertence a um `tenant_id`.
-
----
-
-##  Backend (Node.js)
-
-### Stack
-
-* Node.js
-* Express
-* JWT
-* Middleware de autenticação
-* Arquitetura REST
-
-### Responsabilidades
-
-* Login / autenticação
-* Validação de token
-* CRUD de módulos (leads, vendas, etc)
-* Regras de negócio
-
-### Estrutura base
-
-```
-backend/
-├── src/
-│   ├── routes/
-│   ├── controllers/
+ChronosTechCRM/saas-multitenant/
+├── app/                    # Frontend (Next.js 14)
+│   ├── components/         # Componentes compartilhados
+│   │   ├── Header.jsx     # Header global
+│   │   └── ModuleLayout.jsx # Layout de módulo
+│   ├── dashboard/         # Página principal
+│   ├── leads/             # Módulo Leads
+│   │   ├── Overview.jsx   # Visão Geral
+│   │   ├── Acquisition.jsx # Aquisição & Funil
+│   │   ├── Pipeline.jsx   # Pipeline Kanban
+│   │   ├── Performance.jsx # Performance
+│   │   └── Reports.jsx    # Relatórios
+│   ├── login/             # Página de login
+│   ├── register/          # Página de cadastro
+│   ├── layout.jsx         # Layout raiz
+│   ├── page.jsx           # Landing page
+│   └── globals.css        # Estilos globais
+│
+├── backend/               # Backend (Express)
+│   ├── config/
+│   │   └── db.js          # Conexão com banco
+│   ├── controllers/       # Controllers
+│   ├── database/
+│   │   └── leads_table.sql # Script SQL
 │   ├── middlewares/
-│   ├── services/
-│   └── index.js
+│   │   └── tenantContext.js # Multitenancy
+│   ├── models/           # Modelos do banco
+│   ├── routes/            # Rotas da API
+│   │   ├── authRoutes.js  # Autenticação
+│   │   ├── leadsRoutes.js # Leads API
+│   │   └── ...
+│   ├── services/          # Serviços
+│   └── app.js             # Servidor principal
+│
+├── .env                   # Variáveis de ambiente
+├── package.json
+└── README.md
 ```
 
 ---
 
-##  Frontend (React)
+##  Módulo Leads
 
-### Stack
+O módulo Leads possui 5 abas:
 
-* React
-* React Router
-* CSS puro (por enquanto)
-* Arquitetura modular
-
----
-
-##  Arquitetura do Frontend
-
-### Princípios
-
-* **App.js não conhece layout nem módulos**
-* Layout é genérico
-* Módulos apenas injetam configuração
+| Aba | Descrição |
+|-----|-----------|
+| **Overview** | Métricas gerais, KPIs, leads por status |
+| **Acquisition** | Análise de aquisição e conversão |
+| **Pipeline** | Kanban visual de oportunidades |
+| **Performance** | Performance da equipe |
+| **Reports** | Relatórios e análises |
 
 ---
 
-### Estrutura de Pastas
+##  Multitenancy
 
-```
-src/
-├── App.js
-├── layouts/
-│   └── ModuleLayout.jsx
-├── pages/
-│   ├── Login.jsx
-│   └── Dashboard.jsx
-├── components/
-│   ├── Header.jsx
-│   └── ProtectedRoute.jsx
-├── modules/
-│   └── leads/
-│       ├── index.js
-│       └── pages/
-│           ├── Overview.jsx
-│           ├── Acquisition.jsx
-│           └── Performance.jsx
-```
+O sistema utiliza middleware `tenantContext` para isolar dados por tenant:
+
+1. Usuário faz login → recebe `tenant_id` no cookie
+2. Todas requisições incluem header `x-tenant-id`
+3. Backend filtra dados pelo `tenant_id`
 
 ---
 
-##  App.js
+##  Como Rodar
 
-Responsável apenas por:
+### Pré-requisitos
 
-* rotas públicas
-* rotas protegidas
+- Node.js 
+- Banco de dados PostgreSQL (Supabase)
 
-Não possui lógica de layout nem módulos.
+### Configuração
 
----
+1. Clone o projeto
+2. Configure o arquivo `.env`:
 
-##  ProtectedRoute
-
-* Componente que valida se existe token
-* Se não existir → redireciona para `/login`
-* Se existir → renderiza o conteúdo protegido
-
----
-
-##  Dashboard
-
-* Página principal após login
-* Monta:
-
-  * Header global
-  * ModuleLayout
-
-Responsável futuramente por:
-
-* trocar módulo ativo
-* gerenciar estado global do módulo
-
----
-
-##  ModuleLayout (Layout Cru)
-
-Layout genérico reutilizado por todos os módulos.
-
-### Responsabilidades
-
-* Margem geral da página
-* Cabeçalho do módulo
-* Botão de três pontos (⋮)
-* Sidebar lateral que abre/fecha
-* Renderizar tabs do módulo
-
-### NÃO faz
-
-* Não conhece Leads
-* Não conhece Financeiro
-* Não possui regras de negócio
-
----
-
-## Módulos
-
-Cada módulo:
-
-* NÃO cria layout
-* NÃO mexe em estrutura visual global
-* Apenas exporta configuração
-
-### Exemplo: módulo Leads
-
-```
-export const leadsModule = {
-  name: 'Leads',
-  tabs: [
-    { key: 'overview', label: 'Visão Geral', component: Overview },
-    { key: 'acquisition', label: 'Aquisição & Funil', component: Acquisition },
-    { key: 'performance', label: 'Performance', component: Performance }
-  ]
-}
+```env
+DATABASE_URL=postgresql://postgres:[SENHA]@db.[PROJETO].supabase.co:5432/postgres
+JWT_SECRET=[SUA_CHAVE_SECRETA]
+PORT=3000
 ```
 
----
+3. Execute o script SQL em `backend/database/leads_table.sql` no banco
 
-##  Módulo Leads – Estrutura de Produto
+### Iniciar Backend
 
-### Aba 1 – Visão Geral
+```bash
+cd saas-multitenant
+node backend/app.js
+```
 
-* Cards de métricas
-* Leads ao longo do tempo
-* Funil resumido
-* Leads por status
-* Origem dos leads
+O backend roda na porta **3000**.
 
-### Aba 2 – Aquisição & Funil
+### Iniciar Frontend
 
-* Leads por origem
-* Conversão por canal
-* Funil completo
-* Tempo por etapa
-* Motivos de perda
+```bash
+cd saas-multitenant
+npm run dev -- -p 3001
+```
 
-### Aba 3 – Performance
-
-* Tempo médio de resposta
-* Leads sem follow-up
-* Performance por vendedor
-* Ranking de vendedores
+O frontend roda na porta **3001**.
 
 ---
-
-## Próximos Passos 
-
-* Integração frontend ↔ backend
-* Rotas por aba (`/leads/overview`)
-* Gráficos reais (Recharts ou similar)
-* Controle de permissões por usuário
-* Planos (Free / Pro)
-* Auditoria e logs
-
-**Chronos Tech CRM**
-
-Projeto desenvolvido com foco em aprendizado profundo e construção de um SaaS real.
