@@ -1,43 +1,120 @@
+// ============================================
+// ChronosTech CRM - Express Backend
+// app.js - Final Version
+// ============================================
+
+require('dns').setDefaultResultOrder('ipv4first'); // força IPv4 primeiro
 require('dotenv').config({ path: __dirname + '/.env' });
+
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+
 const tenantContext = require('./middlewares/tenantContext');
-const path = require('path');
+const pool = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
 const leadsRoutes = require('./routes/leadsRoutes');
 const assetRoutes = require('./routes/assetsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const targetsRoutes = require('./routes/targetsRoutes');
+const sellersRoutes = require('./routes/sellersRoutes');
 
 const app = express();
 
-// CORS configurado para permitir requisições do frontend React e Next.js
+// ============================================
+// CONFIGURAÇÕES
+// ============================================
+
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+];
+
+// --- 1. CORS ---
 app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'http://localhost:3001',
-    'http://localhost:3002', // Next.js default
-  ],
-  credentials: true, // Permite envio de cookies
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id']
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
 }));
-app.use(express.json());
 
-// 1. AUTH SEMPRE PRIMEIRO (register/login SEM tenant)
-app.use('/auth', authRoutes);
+// --- 2. Body parsers ---
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 2. FRONTEND ESTÁTICO (NUNCA passa por middleware)
-app.use(express.static(path.join(__dirname, 'public')));
-app.get(['/', '/dashboard.html'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// --- 3. Cookie parser ---
+app.use(cookieParser());
+
+// --- 4. Logging de requisições (opcional) ---
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
 });
 
-// 3. APENAS ROTAS API PRIVADAS usam tenantContext
-app.use('/api', tenantContext);  // ← /api/leads, /api/assets, /api/webhooks
+// ============================================
+// ROTAS PÚBLICAS (Auth)
+// ============================================
+
+app.use('/auth', authRoutes);
+
+// ============================================
+// ROTAS PROTEGIDAS (Multi-tenant)
+// ============================================
+
+app.use('/api', tenantContext);
 app.use('/api/leads', leadsRoutes);
+app.use('/api/targets', targetsRoutes);
+app.use('/api/sellers', sellersRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(` CRM rodando na porta ${PORT}`));
+// ============================================
+// 404 Handler
+// ============================================
+
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: 'Rota não encontrada' });
+});
+
+// ============================================
+// Global Error Handler
+// ============================================
+
+app.use((err, req, res, next) => {
+  console.error('[GLOBAL ERROR]', err);
+
+  const message = process.env.NODE_ENV === 'production'
+    ? 'Erro interno do servidor'
+    : err.message;
+
+  res.status(err.status || 500).json({
+    success: false,
+    error: message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+  });
+});
+
+// ============================================
+// START SERVER
+// ============================================
+
+const PORT = process.env.PORT || 5000;
+
+(async () => {
+  try {
+    await pool.query('SELECT NOW()'); // testa conexão com DB
+    console.log('Conectado ao Banco de Dados');
+    console.log(`CRM rodando na porta ${PORT}`);
+    app.listen(PORT);
+  } catch (err) {
+    console.error('Erro ao conectar no banco:', err.message);
+    process.exit(1);
+  }
+})();

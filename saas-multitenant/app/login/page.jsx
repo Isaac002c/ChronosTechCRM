@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Usar o endpoint correto do backend Express
+      // Usar o endpoint correto do backend Express (porta 3000)
       const response = await fetch('http://localhost:3000/auth/login', {
         method: 'POST',
         headers: {
@@ -25,23 +25,53 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      // Get response text first to debug
+      const text = await response.text();
+      console.log('[Login] Response status:', response.status);
+      console.log('[Login] Response body:', text);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Servidor retornou resposta vazia. O backend está rodando?');
+      }
+      
+      // Parse JSON
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error(`Resposta inválida do servidor: ${text.substring(0, 100)}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.message || data.error || 'Erro ao fazer login');
       }
 
       // Armazenar token em cookie HTTP-only (o backend deve enviar o cookie)
-      // Por enquanto, armazenamos no cookie manualmente se o backend enviar
+      // Por enquanto, armazenamos no localStorage para uso nas chamadas API
       if (data.token) {
+        // Armazenar token no localStorage para uso nas chamadas API
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('auth-token', data.token);
+        
         // Definir cookie manualmente (em produção, o backend deve enviar HttpOnly cookie)
-        document.cookie = `auth-token=${data.token}; path=/; max-age=${30 * 24 * 60 * 60}`; // 30 dias
-        document.cookie = `tenant-id=${data.tenant?.id || ''}; path=/; max-age=${30 * 24 * 60 * 60}`;
+        document.cookie = `auth-token=${data.token}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+        
+        console.log('[Login] Token saved to localStorage:', data.token.substring(0, 20) + '...');
       }
 
       // Salvar dados do usuário no localStorage para uso no frontend
       localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('tenant', JSON.stringify(data.tenant));
+      
+      // Also save tenantId directly - CRITICAL for API calls
+      const tenantIdValue = data.tenant?.id || data.tenant?.tenant_id || '';
+      localStorage.setItem('tenantId', tenantIdValue);
+      localStorage.setItem('tenant-id', tenantIdValue);
+      
+      // Also save in cookie for redundancy
+      document.cookie = `tenant-id=${tenantIdValue}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+
+      console.log('[Login] Saved tenantId:', tenantIdValue);
 
       // Redirecionar para o dashboard
       router.push('/dashboard');

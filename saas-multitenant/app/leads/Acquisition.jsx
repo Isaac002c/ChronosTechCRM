@@ -8,6 +8,9 @@ export default function LeadsAcquisition() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
 
+  // Valor médio por negócio
+  const avgDealValue = 15000;
+
   useEffect(() => {
     loadData();
   }, []);
@@ -52,21 +55,37 @@ export default function LeadsAcquisition() {
     return colors[status] || '#6B7280';
   };
 
-  // Calcular métricas de aquisição
+  // Calcular métricas de aquisição com impacto financeiro
   const calculateAcquisitionMetrics = () => {
     const total = stats.total || 1;
     const bySource = stats.bySource || [];
     
-    // Encontrar canal mais eficiente (maior conversão para ganho)
-    let mostEfficient = { source: 'N/A', rate: 0 };
-    
-    // Simular taxa de conversão por canal (em produção viria do backend)
-    bySource.forEach(source => {
-      const simulatedRate = Math.random() * 30 + 10; // 10-40% simulado
-      if (simulatedRate > mostEfficient.rate) {
-        mostEfficient = { source: source.source, rate: simulatedRate };
-      }
+    // Calcular receita por canal
+    const channelMetrics = bySource.map(source => {
+      // Simular que 20-40% dos leads de cada canal são ganhos
+      const simulatedGainedRate = Math.random() * 0.3 + 0.1;
+      const gainedCount = Math.round(source.count * simulatedGainedRate);
+      const revenue = gainedCount * avgDealValue;
+      const ticketMedio = gainedCount > 0 ? revenue / gainedCount : 0;
+      
+      return {
+        ...source,
+        gainedCount,
+        revenue,
+        ticketMedio,
+        conversionRate: (simulatedGainedRate * 100).toFixed(1)
+      };
     });
+
+    // Encontrar canal mais eficiente (maior receita)
+    const mostProfitable = channelMetrics.reduce((best, current) => 
+      current.revenue > (best?.revenue || 0) ? current : best
+    , channelMetrics[0]);
+
+    // Encontrar canal com melhor conversão
+    const bestConversion = channelMetrics.reduce((best, current) => 
+      parseFloat(current.conversionRate) > parseFloat(best?.conversionRate || 0) ? current : best
+    , channelMetrics[0]);
 
     // Crescimento por canal (simulado)
     const growth = bySource.map(source => ({
@@ -74,10 +93,28 @@ export default function LeadsAcquisition() {
       growth: Math.round((Math.random() * 40) - 10) // -10% a +30%
     }));
 
-    return { mostEfficient, growth };
+    // Total de receita
+    const totalRevenue = channelMetrics.reduce((sum, ch) => sum + ch.revenue, 0);
+
+    return { 
+      channelMetrics, 
+      mostProfitable, 
+      bestConversion,
+      growth,
+      totalRevenue
+    };
   };
 
   const acquisitionMetrics = calculateAcquisitionMetrics();
+
+  // Formatar moeda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
 
   if (loading) return <div className="loading">Carregando dados de Aquisição...</div>;
 
@@ -98,20 +135,23 @@ export default function LeadsAcquisition() {
         </div>
         
         <div className="kpi-card success">
-          <div className="kpi-value">{getCount('ganho')}</div>
-          <div className="kpi-label">Convertidos</div>
+          <div className="kpi-value">{formatCurrency(acquisitionMetrics.totalRevenue)}</div>
+          <div className="kpi-label">Receita Total</div>
+        </div>
+        
+        <div className="kpi-card primary">
+          <div className="kpi-value">{acquisitionMetrics.mostProfitable?.source || 'N/A'}</div>
+          <div className="kpi-label">Canal mais lucrativo</div>
+          <div className="kpi-change positive">
+            {formatCurrency(acquisitionMetrics.mostProfitable?.revenue || 0)}
+          </div>
         </div>
         
         <div className="kpi-card warning">
-          <div className="kpi-value">{getCount('qualificado')}</div>
-          <div className="kpi-label">Qualificados</div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-value">{acquisitionMetrics.mostEfficient.source}</div>
-          <div className="kpi-label">Canal mais eficiente</div>
+          <div className="kpi-value">{acquisitionMetrics.bestConversion?.source || 'N/A'}</div>
+          <div className="kpi-label">Melhor conversão</div>
           <div className="kpi-change positive">
-            {acquisitionMetrics.mostEfficient.rate.toFixed(1)}% conversão
+            {acquisitionMetrics.bestConversion?.conversionRate || 0}% conversão
           </div>
         </div>
       </div>
@@ -154,33 +194,42 @@ export default function LeadsAcquisition() {
         </div>
       </div>
 
-      {/* Leads por Origem - Gráfico de Barras */}
+      {/* Receita por Canal */}
       <div className="section">
-        <h3>Leads por Fonte</h3>
-        {(!stats.bySource || stats.bySource.length === 0) ? (
+        <h3>Receita por Canal</h3>
+        {(!acquisitionMetrics.channelMetrics || acquisitionMetrics.channelMetrics.length === 0) ? (
           <p className="no-data">Nenhuma fonte registrada</p>
         ) : (
           <div className="sources-grid">
-            {stats.bySource.map((source) => {
-              const percentage = stats.total > 0 ? ((source.count / stats.total) * 100).toFixed(1) : 0;
-              const growthData = acquisitionMetrics.growth.find(g => g.source === source.source);
+            {acquisitionMetrics.channelMetrics.map((channel) => {
+              const percentage = acquisitionMetrics.totalRevenue > 0 ? 
+                ((channel.revenue / acquisitionMetrics.totalRevenue) * 100).toFixed(1) : 0;
+              const isMostProfitable = channel.source === acquisitionMetrics.mostProfitable?.source;
               
               return (
-                <div key={source.source} className="source-card">
+                <div key={channel.source} className={`source-card ${isMostProfitable ? 'highlight' : ''}`}>
                   <div className="source-header">
-                    <span className="source-name">{source.source || 'Sem origem'}</span>
-                    <span className="source-count">{source.count}</span>
+                    <span className="source-name">
+                      {channel.source || 'Sem origem'}
+                      {isMostProfitable && ' ⭐'}
+                    </span>
+                    <span className="source-count">{channel.count} leads</span>
+                  </div>
+                  <div className="source-revenue">
+                    {formatCurrency(channel.revenue)}
                   </div>
                   <div className="source-bar">
-                    <div className="source-fill" style={{ width: `${percentage}%` }} />
+                    <div 
+                      className="source-fill" 
+                      style={{ 
+                        width: `${percentage}%`,
+                        backgroundColor: isMostProfitable ? '#22c55e' : '#3b82f6'
+                      }} 
+                    />
                   </div>
                   <div className="source-footer">
-                    <span className="source-percent">{percentage}%</span>
-                    {growthData && (
-                      <span className={`growth-badge ${growthData.growth >= 0 ? 'positive' : 'negative'}`}>
-                        {growthData.growth >= 0 ? '↑' : '↓'} {Math.abs(growthData.growth)}%
-                      </span>
-                    )}
+                    <span className="source-percent">{percentage}% do total</span>
+                    <span className="source-ticket">Ticket: {formatCurrency(channel.ticketMedio)}</span>
                   </div>
                 </div>
               );
@@ -193,21 +242,22 @@ export default function LeadsAcquisition() {
       <div className="section">
         <h3>Taxa de Conversão por Canal</h3>
         <div className="rates-grid">
-          {stats.bySource?.map((source) => {
-            // Simular taxa de conversão (em produção viria do backend)
-            const conversionRate = (Math.random() * 30 + 5).toFixed(1);
-            const isGood = parseFloat(conversionRate) > 20;
+          {acquisitionMetrics.channelMetrics?.map((channel) => {
+            const isBest = channel.source === acquisitionMetrics.bestConversion?.source;
             
             return (
-              <div key={source.source} className="rate-card">
-                <div className="rate-label">{source.source || 'Sem origem'}</div>
-                <div className="rate-value" style={{ color: isGood ? '#22c55e' : '#f59e0b' }}>
-                  {conversionRate}%
+              <div key={channel.source} className="rate-card">
+                <div className="rate-label">
+                  {channel.source || 'Sem origem'}
+                  {isBest && ' 🏆'}
+                </div>
+                <div className="rate-value" style={{ color: isBest ? '#22c55e' : '#1e293b' }}>
+                  {channel.conversionRate}%
                 </div>
                 <div className="rate-bar">
                   <div 
-                    className={`rate-fill ${isGood ? 'success' : ''}`} 
-                    style={{ width: `${conversionRate}%` }}
+                    className={`rate-fill ${parseFloat(channel.conversionRate) > 20 ? 'success' : ''}`} 
+                    style={{ width: `${Math.min(channel.conversionRate, 100)}%` }}
                   />
                 </div>
               </div>

@@ -2,14 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import leadsAPI from '../lib/leadsAPI';
+import targetsAPI from '../lib/targetsAPI';
 
 export default function LeadsOverview() {
   const [leads, setLeads] = useState([]);
   const [stats, setStats] = useState({ total: 0, byStatus: [], bySource: [] });
+  const [pipelineMetrics, setPipelineMetrics] = useState(null);
+  const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [targetForm, setTargetForm] = useState({ month: new Date().getMonth() + 1, target_value: 0 });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -17,6 +22,7 @@ export default function LeadsOverview() {
     email: '',
     phone: '',
     company: '',
+    value: 0,
     status: 'novo',
     source: 'site'
   });
@@ -28,15 +34,29 @@ export default function LeadsOverview() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [leadsData, statsData] = await Promise.all([
+      const [leadsData, statsData, targetsData, pipelineData] = await Promise.all([
         leadsAPI.getAll(),
-        leadsAPI.getStats()
+        leadsAPI.getStats(),
+        targetsAPI.getTargets(),
+        leadsAPI.getPipelineMetrics().catch(() => null)
       ]);
       setLeads(leadsData);
       setStats(statsData);
+      setTargets(targetsData);
+      setPipelineMetrics(pipelineData);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
-      setMessage({ type: 'error', text: err.message });
+      // Carrega dados básicos mesmo se alguns falharem
+      try {
+        const [leadsData, statsData] = await Promise.all([
+          leadsAPI.getAll(),
+          leadsAPI.getStats()
+        ]);
+        setLeads(leadsData);
+        setStats(statsData);
+      } catch (e) {
+        console.error('Erro ao carregar dados básicos:', e);
+      }
     } finally {
       setLoading(false);
     }
@@ -52,7 +72,7 @@ export default function LeadsOverview() {
         await leadsAPI.create(formData);
         setMessage({ type: 'success', text: 'Lead criado com sucesso!' });
       }
-      setFormData({ name: '', email: '', phone: '', company: '', status: 'novo', source: 'site' });
+      setFormData({ name: '', email: '', phone: '', company: '', value: 0, status: 'novo', source: 'site' });
       setShowForm(false);
       setEditingLead(null);
       loadData();
@@ -67,6 +87,7 @@ export default function LeadsOverview() {
       email: lead.email,
       phone: lead.phone || '',
       company: lead.company || '',
+      value: lead.value || 0,
       status: lead.status,
       source: lead.source || 'site'
     });
@@ -87,53 +108,216 @@ export default function LeadsOverview() {
     }
   };
 
+  const handleSaveTarget = async (e) => {
+    e.preventDefault();
+    try {
+      await targetsAPI.createTarget({
+        month: parseInt(targetForm.month),
+        year: new Date().getFullYear(),
+        target_value: parseFloat(targetForm.target_value)
+      });
+      setMessage({ type: 'success', text: 'Meta salva com sucesso!' });
+      setShowTargetModal(false);
+      loadData();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    }
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       novo: '#3B82F6',
       contactado: '#F59E0B',
       qualificado: '#8B5CF6',
       proposta: '#10B981',
+      negociacao: '#06B6D4',
       ganho: '#22C55E',
       perdido: '#EF4444'
     };
     return colors[status] || '#6B7280';
   };
 
-  // Calcular métricas do Overview
+  // ========== SCORE AUTOMÁTICO DE LEAD ==========
+  const calculateLeadScore = (lead) => {
+    let score = 0;
+    
+    // Por valor
+    if (lead.value > 5000) score += 20;
+    else if (lead.value > 2000) score += 10;
+    
+    // Por estágio
+    if (lead.status === 'proposta' || lead.status === 'negociacao') score += 15;
+    else if (lead.status === 'qualificado') score += 10;
+    else if (lead.status === 'contactado') score += 5;
+    
+    // Por canal
+    if (lead.source === 'indicacao') score += 15;
+    else if (lead.source === 'site') score += 10;
+    else if (lead.source === 'google') score += 10;
+    
+    // Penalidade por tempo inativo
+    const daysSinceCreation = Math.floor((Date.now() - new Date(lead.created_at)) / (1000 * 60 * 60 * 24));
+    if (daysSinceCreation > 30) score -= 10;
+    else if (daysSinceCreation < 7) score += 10;
+    
+    return score;
+  };
+
+  const getLeadTemperature = (score) => {
+    if (score >= 30) return { label: 'Quente', emoji: '🔥', color: '#EF4444' };
+    if (score >= 15) return { label: 'Morno', emoji: '🟡', color: '#F59E0B' };
+    return { label: 'Frio', emoji: '❄️', color: '#3B82F6' };
+  };
+
+  // ========== PROBABILIDADES POR ESTÁGIO ==========
+  const stageProbabilities = {
+    novo: 0.10,
+    contactado: 0.20,
+    qualificado: 0.30,
+    proposta: 0.60,
+    negociacao: 0.80,
+    ganho: 1.00
+  };
+
+  // Calcular métricas estratégicas do Overview
   const calculateOverviewMetrics = () => {
     const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
     
     const total = leads.length;
-    const newThisWeek = leads.filter(l => new Date(l.created_at) > weekAgo).length;
     
-    const gained = leads.filter(l => l.status === 'ganho').length;
-    const lost = leads.filter(l => l.status === 'perdido').length;
+    // Leads ganhos no mês atual
+    const gainedThisMonth = leads.filter(l => 
+      l.status === 'ganho' && new Date(l.created_at) >= monthStart
+    );
     
-    const conversionRate = total > 0 ? ((gained / total) * 100).toFixed(1) : 0;
+    // Leads ganhos no mês passado (para comparação)
+    const gainedLastMonth = leads.filter(l => 
+      l.status === 'ganho' && 
+      new Date(l.created_at) >= lastMonthStart && 
+      new Date(l.created_at) <= lastMonthEnd
+    );
     
-    // Simular receita prevista (em produção viria do backend)
-    const predictedRevenue = gained * 15000; // R$ 15.000 médio
-    const averageTicket = gained > 0 ? predictedRevenue / gained : 0;
-
+    // Pipeline total (leads em etapas ativas)
+    const pipelineLeads = leads.filter(l => 
+      ['novo', 'contactado', 'qualificado', 'proposta', 'negociacao'].includes(l.status)
+    );
+    
+    // Calcular receita prevista REAL com valores dos leads
+    let forecastValue = 0;
+    const leadsByStage = {
+      novo: [],
+      contactado: [],
+      qualificado: [],
+      proposta: [],
+      negociacao: [],
+      ganho: []
+    };
+    
+    leads.forEach(lead => {
+      if (leadsByStage[lead.status]) {
+        const leadValue = lead.value || 15000; // Usa valor real ou padrão
+        leadsByStage[lead.status].push(lead);
+        forecastValue += leadValue * (stageProbabilities[lead.status] || 0);
+      }
+    });
+    
+    // Receita FECHADA real (soma dos valores dos leads ganhos)
+    const revenueThisMonth = gainedThisMonth.reduce((sum, l) => sum + (l.value || 15000), 0);
+    const revenueLastMonth = gainedLastMonth.reduce((sum, l) => sum + (l.value || 15000), 0);
+    
+    // ========== META DO MÊS ==========
+    const currentTarget = targets.find(t => t.month === currentMonth && t.year === currentYear);
+    const companyTarget = currentTarget ? parseFloat(currentTarget.target_value) : 100000; // Padrão R$ 100k
+    const targetProgress = companyTarget > 0 ? (revenueThisMonth / companyTarget * 100) : 0;
+    const gapToTarget = Math.max(0, companyTarget - forecastValue);
+    
+    // ========== META ANUAL ==========
+    const annualTarget = targets.reduce((sum, t) => sum + parseFloat(t.target_value || 0), 0) || (companyTarget * 12);
+    const projectedMonthly = forecastValue; // Projeção baseada em forecast
+    
+    // ========== PROJEÇÃO DE FECHAMENTO ==========
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysRemaining = daysInMonth - dayOfMonth;
+    
+    // Média diária de receita
+    const avgDailyRevenue = dayOfMonth > 0 ? revenueThisMonth / dayOfMonth : 0;
+    const projectedClose = avgDailyRevenue * daysInMonth; // Projeção simples
+    const projectedCloseAdvanced = forecastValue + (avgDailyRevenue * daysRemaining); // Projeção com pipeline
+    
+    // ========== FORECAST DETALHADO POR ESTÁGIO ==========
+    const forecastByStage = Object.keys(stageProbabilities).map(stage => ({
+      stage,
+      count: leadsByStage[stage].length,
+      probability: (stageProbabilities[stage] * 100).toFixed(0),
+      weightedValue: leadsByStage[stage].reduce((sum, l) => sum + ((l.value || 15000) * stageProbabilities[stage]), 0)
+    }));
+    
+    // ========== CRESCIMENTO VS MÊS ANTERIOR ==========
+    const growth = revenueLastMonth > 0 ? 
+      (((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100).toFixed(1) : 
+      revenueThisMonth > 0 ? 100 : 0;
+    
+    // ========== LEADS COM SCORE ==========
+    const leadsWithScore = leads.map(lead => ({
+      ...lead,
+      score: calculateLeadScore(lead),
+      temperature: getLeadTemperature(calculateLeadScore(lead))
+    }));
+    
     // Leads recentes (últimos 5)
-    const recentLeads = [...leads]
+    const recentLeads = [...leadsWithScore]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 5);
 
     return {
       total,
-      newThisWeek,
-      conversionRate,
-      gained,
-      lost,
-      predictedRevenue,
-      averageTicket,
+      pipelineLeads: pipelineLeads.length,
+      pipelineValue: pipelineLeads.reduce((sum, l) => sum + (l.value || 15000), 0),
+      revenueThisMonth,
+      revenueLastMonth,
+      gainedThisMonth: gainedThisMonth.length,
+      gainedLastMonth: gainedLastMonth.length,
+      // Meta
+      companyTarget,
+      annualTarget,
+      targetProgress,
+      gapToTarget,
+      // Projeção
+      projectedClose,
+      projectedCloseAdvanced,
+      daysRemaining,
+      // Forecast
+      forecastValue,
+      forecastByStage,
+      // Crescimento
+      growth,
+      // Leads
+      leadsWithScore,
       recentLeads
     };
   };
 
   const metrics = calculateOverviewMetrics();
+
+  // Formatar moeda
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  // Formatar data
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('pt-BR');
+  };
 
   if (loading) {
     return <div className="loading">Carregando Visão Geral...</div>;
@@ -143,12 +327,12 @@ export default function LeadsOverview() {
     <div className="overview-container">
       {/* Mensagens */}
       {message.text && (
-        <div className={message.type === 'error' ? 'error-message' : 'success-message'}>
+        <div className={`${message.type === 'error' ? 'error-message' : 'success-message'} message-banner`}>
           {message.text}
         </div>
       )}
       
-      {/* KPIs Principais - Overview */}
+      {/* ========== KPIs PRINCIPAIS - GESTÃO COMERCIAL ========== */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-value">{metrics.total}</div>
@@ -156,51 +340,175 @@ export default function LeadsOverview() {
         </div>
         
         <div className="kpi-card success">
-          <div className="kpi-value">+{metrics.newThisWeek}</div>
-          <div className="kpi-label">Novos (7 dias)</div>
-          <div className="kpi-change positive">Esta semana</div>
+          <div className="kpi-value">{formatCurrency(metrics.revenueThisMonth)}</div>
+          <div className="kpi-label">📊 Receita Fechada</div>
         </div>
         
-        <div className="kpi-card warning">
-          <div className="kpi-value">{metrics.conversionRate}%</div>
-          <div className="kpi-label">Taxa de Conversão</div>
+        <div className="kpi-card primary">
+          <div className="kpi-value">{formatCurrency(metrics.pipelineValue)}</div>
+          <div className="kpi-label">Pipeline Total</div>
         </div>
         
-        <div className="kpi-card success">
-          <div className="kpi-value">{metrics.gained}</div>
-          <div className="kpi-label">Leads Ganhos</div>
-        </div>
-        
-        <div className="kpi-card danger">
-          <div className="kpi-value">{metrics.lost}</div>
-          <div className="kpi-label">Leads Perdidos</div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-value">R$ {metrics.predictedRevenue.toLocaleString('pt-BR')}</div>
-          <div className="kpi-label">Receita Prevista</div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-value">R$ {metrics.averageTicket.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</div>
-          <div className="kpi-label">Ticket Médio</div>
+        <div className="kpi-card purple">
+          <div className="kpi-value">{formatCurrency(metrics.forecastValue)}</div>
+          <div className="kpi-label">📈 Receita Projetada</div>
         </div>
       </div>
 
-      {/* Botão adicionar */}
+      {/* ========== PAINEL DE METAS ========== */}
+      <div className="section">
+        <div className="section-header">
+          <h3>🎯 Painel de Gestão Comercial</h3>
+          <button className="btn-small" onClick={() => setShowTargetModal(true)}>
+            Definir Meta
+          </button>
+        </div>
+        
+        <div className="target-panel">
+          <div className="target-card large">
+            <div className="target-label">Meta do Mês</div>
+            <div className="target-value">{formatCurrency(metrics.companyTarget)}</div>
+            <div className="target-progress">
+              <div 
+                className="target-progress-fill"
+                style={{ 
+                  width: `${Math.min(metrics.targetProgress, 100)}%`,
+                  background: metrics.targetProgress >= 100 ? 'linear-gradient(90deg, #22c55e, #16a34a)' : 'linear-gradient(90deg, #3b82f6, #2563eb)'
+                }}
+              />
+            </div>
+            <div className="target-stats">
+              <span>{metrics.targetProgress.toFixed(1)}% atingido</span>
+              <span>•</span>
+              <span>{metrics.gainedThisMonth} deals fechados</span>
+            </div>
+          </div>
+          
+          <div className="target-card large">
+            <div className="target-label">Meta Anual</div>
+            <div className="target-value">{formatCurrency(metrics.annualTarget)}</div>
+            <div className="target-progress">
+              <div 
+                className="target-progress-fill"
+                style={{ 
+                  width: `${Math.min((metrics.revenueThisMonth * 12 / metrics.annualTarget) * 100, 100)}%`,
+                  background: 'linear-gradient(90deg, #8b5cf6, #7c3aed)'
+                }}
+              />
+            </div>
+            <div className="target-stats">
+              <span>Soma das metas mensais</span>
+            </div>
+          </div>
+          
+          <div className="target-card large">
+            <div className="target-label">📌 Gap para Meta</div>
+            <div className={`target-value ${metrics.forecastValue >= metrics.companyTarget ? 'positive' : 'negative'}`}>
+              {metrics.forecastValue >= metrics.companyTarget 
+                ? '✅ Meta Batida!' 
+                : formatCurrency(metrics.gapToTarget)
+              }
+            </div>
+            <div className="target-stats">
+              <span>Faltam {formatCurrency(Math.max(0, metrics.companyTarget - metrics.revenueThisMonth))} em receita fechada</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========== PROJEÇÃO DE FECHAMENTO ========== */}
+      <div className="section">
+        <h3>🔮 Projeção de Fechamento do Mês</h3>
+        <div className="projection-grid">
+          <div className="projection-card">
+            <div className="projection-label">Projeção Simples</div>
+            <div className="projection-value">{formatCurrency(metrics.projectedClose)}</div>
+            <div className="projection-sub">Média diária × dias do mês</div>
+          </div>
+          <div className="projection-card">
+            <div className="projection-label">Projeção Avançada</div>
+            <div className="projection-value">{formatCurrency(metrics.projectedCloseAdvanced)}</div>
+            <div className="projection-sub">Forecast + tendência</div>
+          </div>
+          <div className="projection-card">
+            <div className="projection-label">Dias Restantes</div>
+            <div className="projection-value">{metrics.daysRemaining}</div>
+            <div className="projection-sub">Para fechar o mês</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========== FORECAST - PREVISÃO DE RECEITA PROFISSIONAL ========== */}
+      <div className="section">
+        <h3>📊 Previsão de Receita (Forecast)</h3>
+        <div className="forecast-grid">
+          <div className="forecast-card closed">
+            <div className="forecast-label">Receita Fechada</div>
+            <div className="forecast-value">{formatCurrency(metrics.revenueThisMonth)}</div>
+          </div>
+          <div className="forecast-card projected">
+            <div className="forecast-label">Receita Projetada</div>
+            <div className="forecast-value">{formatCurrency(metrics.forecastValue)}</div>
+            <div className="forecast-sub">Σ (Valor × Probabilidade)</div>
+          </div>
+          <div className="forecast-card target">
+            <div className="forecast-label">Meta do Mês</div>
+            <div className="forecast-value">{formatCurrency(metrics.companyTarget)}</div>
+          </div>
+          <div className={`forecast-card gap ${metrics.forecastValue >= metrics.companyTarget ? 'positive' : 'negative'}`}>
+            <div className="forecast-label">Gap para Meta</div>
+            <div className="forecast-value">
+              {metrics.forecastValue >= metrics.companyTarget 
+                ? '✅ Meta Batida!' 
+                : formatCurrency(metrics.gapToTarget)
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Detalhamento do Forecast por Estágio */}
+      <div className="section">
+        <h3>📋 Forecast por Estágio</h3>
+        <div className="forecast-stages">
+          {metrics.forecastByStage.map((item) => (
+            <div key={item.stage} className="forecast-stage">
+              <div className="stage-header">
+                <span className="stage-name">{item.stage}</span>
+                <span className="stage-count">{item.count} leads</span>
+              </div>
+              <div className="stage-bar">
+                <div 
+                  className="stage-fill"
+                  style={{ 
+                    width: `${item.probability}%`,
+                    backgroundColor: getStatusColor(item.stage)
+                  }}
+                />
+              </div>
+              <div className="stage-footer">
+                <span className="stage-prob">{item.probability}% prob.</span>
+                <span className="stage-value">{formatCurrency(item.weightedValue)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ========== BOTÃO ADICIONAR ========== */}
       <button 
         className="btn-primary" 
         onClick={() => { 
           setShowForm(!showForm); 
           setEditingLead(null); 
-          setFormData({ name: '', email: '', phone: '', company: '', status: 'novo', source: 'site' }); 
+          setFormData({ name: '', email: '', phone: '', company: '', value: 0, status: 'novo', source: 'site' }); 
         }}
         style={{ marginBottom: '20px' }}
       >
         {showForm ? '✕ Cancelar' : '+ Novo Lead'}
       </button>
 
-      {/* Formulário */}
+      {/* ========== FORMULÁRIO ========== */}
       {showForm && (
         <form onSubmit={handleSubmit} className="lead-form">
           <h3>{editingLead ? 'Editar Lead' : 'Novo Lead'}</h3>
@@ -247,16 +555,28 @@ export default function LeadsOverview() {
           </div>
           <div className="form-row">
             <div className="form-group">
+              <label>Valor da Oportunidade (R$)</label>
+              <input
+                type="number"
+                placeholder="15000"
+                value={formData.value}
+                onChange={(e) => setFormData({...formData, value: parseFloat(e.target.value) || 0})}
+              />
+            </div>
+            <div className="form-group">
               <label>Status</label>
               <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
                 <option value="novo">Novo</option>
                 <option value="contactado">Contactado</option>
                 <option value="qualificado">Qualificado</option>
                 <option value="proposta">Proposta</option>
+                <option value="negociacao">Negociação</option>
                 <option value="ganho">Ganho</option>
                 <option value="perdido">Perdido</option>
               </select>
             </div>
+          </div>
+          <div className="form-row">
             <div className="form-group">
               <label>Origem</label>
               <select value={formData.source} onChange={(e) => setFormData({...formData, source: e.target.value})}>
@@ -278,7 +598,7 @@ export default function LeadsOverview() {
         </form>
       )}
 
-      {/* Leads Recentes */}
+      {/* ========== LEADS RECENTES COM SCORE ========== */}
       <div className="section">
         <h3>Leads Recentes</h3>
         {metrics.recentLeads.length === 0 ? (
@@ -287,28 +607,39 @@ export default function LeadsOverview() {
           <table>
             <thead>
               <tr>
+                <th>Temp.</th>
                 <th>Nome</th>
-                <th>Email</th>
-                <th>Telefone</th>
-                <th>Empresa</th>
+                <th>Valor</th>
                 <th>Status</th>
                 <th>Origem</th>
+                <th>Criado</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {metrics.recentLeads.map((lead) => (
                 <tr key={lead.id}>
+                  <td>
+                    <span 
+                      className="temperature-badge"
+                      style={{ 
+                        backgroundColor: lead.temperature.color,
+                        color: '#fff'
+                      }}
+                      title={`Score: ${lead.score}`}
+                    >
+                      {lead.temperature.emoji} {lead.temperature.label}
+                    </span>
+                  </td>
                   <td>{lead.name}</td>
-                  <td>{lead.email || '-'}</td>
-                  <td>{lead.phone || '-'}</td>
-                  <td>{lead.company || '-'}</td>
+                  <td>{formatCurrency(lead.value || 0)}</td>
                   <td>
                     <span className="status-badge" style={{ backgroundColor: getStatusColor(lead.status) }}>
                       {lead.status}
                     </span>
                   </td>
                   <td>{lead.source || '-'}</td>
+                  <td>{formatDate(lead.created_at)}</td>
                   <td>
                     <button onClick={() => handleEdit(lead)} className="btn-small">Editar</button>
                     <button onClick={() => handleDelete(lead.id)} className="btn-small btn-danger">Excluir</button>
@@ -320,16 +651,18 @@ export default function LeadsOverview() {
         )}
       </div>
 
-      {/* Distribuição por Status */}
+      {/* ========== DISTRIBUIÇÃO POR STATUS ========== */}
       <div className="section">
         <h3>Distribuição por Status</h3>
         <div className="status-grid">
           {stats.byStatus?.map((s) => {
             const percentage = stats.total > 0 ? (s.count / stats.total * 100).toFixed(1) : 0;
+            const totalValue = s.total_value || 0;
             return (
               <div key={s.status} className="status-card" style={{ borderLeftColor: getStatusColor(s.status) }}>
                 <div className="status-name">{s.status}</div>
                 <div className="status-count">{s.count} leads ({percentage}%)</div>
+                <div className="status-value">{formatCurrency(totalValue)}</div>
                 <div className="status-bar">
                   <div 
                     className="status-fill" 
@@ -344,6 +677,47 @@ export default function LeadsOverview() {
           })}
         </div>
       </div>
+
+      {/* ========== MODAL DE META ========== */}
+      {showTargetModal && (
+        <div className="modal-overlay" onClick={() => setShowTargetModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Definir Meta do Mês</h3>
+            <form onSubmit={handleSaveTarget}>
+              <div className="form-group">
+                <label>Mês</label>
+                <select 
+                  value={targetForm.month} 
+                  onChange={(e) => setTargetForm({...targetForm, month: e.target.value})}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>
+                      {new Date(2000, m - 1).toLocaleDateString('pt-BR', { month: 'long' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Meta (R$)</label>
+                <input
+                  type="number"
+                  value={targetForm.target_value}
+                  onChange={(e) => setTargetForm({...targetForm, target_value: e.target.value})}
+                  placeholder="100000"
+                />
+              </div>
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowTargetModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary">
+                  Salvar Meta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

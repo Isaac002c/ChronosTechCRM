@@ -1,18 +1,66 @@
-const tenantContextMiddleware = async (req, res, next) => {
+// middlewares/tenantContext.js
+const jwt = require('jsonwebtoken');
+
+console.log('[tenantContext] Middleware carregado!');
+
+module.exports = function tenantContext(req, res, next) {
+  console.log(`[tenantContext] Executando para: ${req.method} ${req.originalUrl}`);
+
   try {
-    // Pega tenant_id do header ou query string
-    const tenantId = req.headers['x-tenant-id'] || req.query.tenant_id;
-    
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID obrigatório' });
+    let token = null;
+
+    // 1️⃣ Header Authorization
+    const authHeader = req.headers['authorization'];
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
     }
-    
-    // Armazena o tenantId na requisição para uso nas rotas
-    req.tenantId = tenantId;
+
+    // 2️⃣ Cookie
+    else if (req.cookies?.token) {
+      token = req.cookies.token;
+    }
+
+    // 3️⃣ Query string (opcional)
+    else if (req.query?.token) {
+      token = req.query.token;
+    }
+
+    // 4️⃣ Se não tiver token
+    if (!token) {
+      console.warn(`[tenantContext] Token não fornecido para ${req.method} ${req.originalUrl}`);
+      return res.status(401).json({ error: 'Token não fornecido.' });
+    }
+
+    // 5️⃣ Decodifica e verifica token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      console.warn('[tenantContext] Token inválido ou expirado:', err.message);
+      return res.status(401).json({ error: 'Token inválido ou expirado.' });
+    }
+
+    // 6️⃣ Valida tenantId
+    if (!decoded.tenantId) {
+      console.warn('[tenantContext] tenantId não encontrado no token.');
+      return res.status(401).json({ error: 'Tenant inválido.' });
+    }
+
+    // 7️⃣ Popula request
+    req.tenantId = String(decoded.tenantId);
+    req.userId = decoded.userId || null;
+    req.userEmail = decoded.email || null;
+
+    console.log('[tenantContext] JWT Decoded:', {
+      userId: req.userId,
+      tenantId: req.tenantId,
+      email: req.userEmail,
+    });
+
     next();
-  } catch (err) {
-    res.status(400).json({ error: 'Tenant inválido', details: err.message });
+
+  } catch (error) {
+    console.error('[tenantContext] Erro inesperado:', error);
+    return res.status(500).json({ error: 'Erro interno no middleware tenantContext.' });
   }
 };
-
-module.exports = tenantContextMiddleware;

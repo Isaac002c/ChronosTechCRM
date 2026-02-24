@@ -36,6 +36,31 @@ router.get('/stats', async (req, res) => {
     }
 });
 
+// GET /api/leads/pipeline - Métricas financeiras do pipeline
+router.get('/pipeline', async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const metrics = await leadModel.getPipelineMetrics(tenantId);
+        res.json({ success: true, data: metrics });
+    } catch (err) {
+        console.error('Erro ao buscar pipeline:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /api/leads/monthly - Métricas mensais (histórico)
+router.get('/monthly', async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const months = parseInt(req.query.months) || 12;
+        const metrics = await leadModel.getMonthlyMetrics(tenantId, months);
+        res.json({ success: true, data: metrics });
+    } catch (err) {
+        console.error('Erro ao buscar métricas mensais:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // GET /api/leads/:id - Buscar lead por ID
 router.get('/:id', async (req, res) => {
     try {
@@ -57,8 +82,17 @@ router.get('/:id', async (req, res) => {
 // POST /api/leads - Criar novo lead
 router.post('/', async (req, res) => {
     try {
-        const { name, email, phone, company, status, source } = req.body;
+        const { name, email, phone, company, value, status, source, stage, seller_id } = req.body;
         const tenantId = req.tenantId;
+        
+        // DEBUG: Log para rastrear tenant_id
+        console.log('[leadsRoutes] POST / - tenantId:', tenantId, 'type:', typeof tenantId);
+        console.log('[leadsRoutes] body:', JSON.stringify(req.body));
+        
+        if (!tenantId) {
+            console.error('[leadsRoutes] ERRO: tenantId não encontrado em req.tenantId!');
+            return res.status(401).json({ success: false, error: 'Tenant não identificado. Faça login novamente.' });
+        }
         
         if (!name || !email) {
             return res.status(400).json({ success: false, error: 'Nome e email são obrigatórios' });
@@ -69,9 +103,12 @@ router.post('/', async (req, res) => {
             email,
             phone,
             company,
+            value: value || 0,
             status,
             source,
-            tenant_id: tenantId
+            stage: stage || 'lead',
+            tenant_id: tenantId,
+            seller_id: seller_id || null
         });
         
         res.status(201).json({ success: true, data: lead });
@@ -85,7 +122,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, phone, company, status, source } = req.body;
+        const { name, email, phone, company, value, status, source, stage, seller_id } = req.body;
         const tenantId = req.tenantId;
         
         const lead = await leadModel.updateLead(id, {
@@ -93,8 +130,11 @@ router.put('/:id', async (req, res) => {
             email,
             phone,
             company,
+            value: value || 0,
             status,
-            source
+            source,
+            stage: stage || 'lead',
+            seller_id: seller_id || null
         }, tenantId);
         
         if (!lead) {
@@ -128,4 +168,3 @@ router.delete('/:id', async (req, res) => {
 });
 
 module.exports = router;
-

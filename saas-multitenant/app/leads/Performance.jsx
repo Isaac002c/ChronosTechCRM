@@ -1,251 +1,545 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import leadsAPI from '../lib/leadsAPI';
+import { useEffect, useState, useCallback } from "react";
+import { leadsAPI } from "@/app/lib/leadsAPI";
+import { getSellers, createSeller, updateSeller, deleteSeller } from "@/app/lib/sellersAPI";
 
-export default function LeadsPerformance() {
-  const [leads, setLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
+// Componente de KPIs globais
+function GlobalKPIs({ leads }) {
+  const totalLeads = leads.length;
+  const gainedLeads = leads.filter(l => l.status === "ganho").length;
+  const totalRevenue = leads
+    .filter(l => l.status === "ganho")
+    .reduce((acc, l) => acc + Number(l.value || 0), 0);
+  const conversionRate = totalLeads > 0 ? ((gainedLeads / totalLeads) * 100).toFixed(1) : 0;
+
+  return (
+    <div style={{ 
+      display: "grid", 
+      gridTemplateColumns: "repeat(4, 1fr)", 
+      gap: "16px",
+      marginBottom: "24px"
+    }}>
+      <KPICard label="Total de Leads" value={totalLeads} icon="📊" />
+      <KPICard label="Leads Ganhos" value={gainedLeads} icon="🤝" />
+      <KPICard label="Receita Total" value={`R$ ${totalRevenue.toLocaleString()}`} icon="💰" />
+      <KPICard label="Taxa de Conversão" value={`${conversionRate}%`} icon="⚡" />
+    </div>
+  );
+}
+
+function KPICard({ label, value, icon }) {
+  return (
+    <div style={{
+      background: "#fff",
+      border: "1px solid #e0e0e0",
+      borderRadius: "12px",
+      padding: "16px",
+      textAlign: "center",
+      boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
+    }}>
+      <div style={{ fontSize: "24px", marginBottom: "8px" }}>{icon}</div>
+      <div style={{ fontSize: "24px", fontWeight: "bold", color: "#333" }}>{value}</div>
+      <div style={{ fontSize: "12px", color: "#666", marginTop: "4px" }}>{label}</div>
+    </div>
+  );
+}
+
+// Modal para adicionar/editar vendedor
+function SellerModal({ isOpen, onClose, onSave, seller, isEditing }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    monthly_target: 50000
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (seller && isEditing) {
+      setFormData({
+        name: seller.name || "",
+        email: seller.email || "",
+        monthly_target: seller.monthly_target || 50000
+      });
+    } else {
+      setFormData({ name: "", email: "", monthly_target: 50000 });
+    }
+    setError("");
+  }, [seller, isEditing, isOpen]);
 
-  const loadData = async () => {
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      setError("Nome é obrigatório");
+      return;
+    }
+    setSaving(true);
+    setError("");
     try {
-      setLoading(true);
-      const leadsData = await leadsAPI.getAll();
-      setLeads(leadsData);
+      await onSave(formData);
+      onClose();
     } catch (err) {
-      console.error('Erro ao carregar leads:', err);
+      setError(err.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  // Calcular métricas de performance (simulado - em produção viria do backend)
-  const calculatePerformanceMetrics = () => {
-    const total = leads.length;
-    const gained = leads.filter(l => l.status === 'ganho').length;
-    const lost = leads.filter(l => l.status === 'perdido').length;
-    
-    // Simular dados de vendedores (em produção isso seria real)
-    const sellers = [
-      { id: 1, name: 'João Silva', leads: Math.floor(total * 0.35), gained: Math.floor(gained * 0.4), conversion: 0 },
-      { id: 2, name: 'Maria Santos', leads: Math.floor(total * 0.30), gained: Math.floor(gained * 0.35), conversion: 0 },
-      { id: 3, name: 'Pedro Costa', leads: Math.floor(total * 0.20), gained: Math.floor(gained * 0.15), conversion: 0 },
-      { id: 4, name: 'Ana Oliveira', leads: Math.floor(total * 0.15), gained: Math.floor(gained * 0.10), conversion: 0 },
-    ];
+  return (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000
+    }} onClick={onClose}>
+      <div style={{
+        background: "#fff",
+        borderRadius: "12px",
+        padding: "24px",
+        width: "400px",
+        maxWidth: "90%"
+      }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ marginBottom: "20px" }}>
+          {isEditing ? "✏️ Editar Vendedor" : "➕ Adicionar Vendedor"}
+        </h3>
+        
+        {error && (
+          <div style={{ 
+            background: "#fee", 
+            color: "#c00", 
+            padding: "10px", 
+            borderRadius: "6px",
+            marginBottom: "16px",
+            fontSize: "14px"
+          }}>
+            {error}
+          </div>
+        )}
 
-    // Calcular conversões
-    const withConversion = sellers.map(s => ({
-      ...s,
-      conversion: s.leads > 0 ? ((s.gained / s.leads) * 100).toFixed(1) : 0
-    }));
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: "500" }}>
+              Nome *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              style={{
+                width: "100%",
+                padding: "10px",
+                border: "1px solid #ddd",
+                borderRadius: "6px",
+                fontSize: "14px"
+              }}
+              placeholder="Nome do vendedor"
+            />
+          </div>
 
-    // Calcular receita gerada (simulado)
-    const revenuePerDeal = 15000; // R$ 15.000 médio
-    const withRevenue = withConversion.map(s => ({
-      ...s,
-      revenue: s.gained * revenuePerDeal
-    }));
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: "500" }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={e => setFormData({ ...formData, email: e.target.value })}
+              style={{
+                width: "100%",
+                padding: "10px",
+                border: "1px solid #ddd",
+                borderRadius: "6px",
+                fontSize: "14px"
+              }}
+              placeholder="email@exemplo.com"
+            />
+          </div>
 
-    // Ranking por leads ganhos
-    const ranking = [...withRevenue].sort((a, b) => b.gained - a.gained);
+          <div style={{ marginBottom: "20px" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: "500" }}>
+              Meta Mensal (R$)
+            </label>
+            <input
+              type="number"
+              value={formData.monthly_target}
+              onChange={e => setFormData({ ...formData, monthly_target: Number(e.target.value) })}
+              style={{
+                width: "100%",
+                padding: "10px",
+                border: "1px solid #ddd",
+                borderRadius: "6px",
+                fontSize: "14px"
+              }}
+              min="0"
+              step="100"
+            />
+          </div>
 
-    // Métricas gerais
-    const avgConversion = total > 0 ? ((gained / total) * 100).toFixed(1) : 0;
-    const avgTimeToClose = 15; // Dias (simulado)
-    const totalRevenue = gained * revenuePerDeal;
+          <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: "10px 20px",
+                border: "1px solid #ddd",
+                borderRadius: "6px",
+                background: "#fff",
+                cursor: "pointer"
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                padding: "10px 20px",
+                border: "none",
+                borderRadius: "6px",
+                background: "#0070f3",
+                color: "#fff",
+                cursor: saving ? "not-allowed" : "pointer",
+                opacity: saving ? 0.7 : 1
+              }}
+            >
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Card de vendedor na lista
+function SellerCard({ seller, stats, onEdit, onDelete }) {
+  const progress = seller.monthly_target > 0 
+    ? Math.min((stats.revenue / seller.monthly_target) * 100, 100) 
+    : 0;
+
+  return (
+    <div style={{
+      border: "1px solid #e0e0e0",
+      borderRadius: "12px",
+      padding: "20px",
+      background: "#fff",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.05)"
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: "18px", color: "#333" }}>{seller.name}</h3>
+          {seller.email && <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#666" }}>{seller.email}</p>}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            onClick={() => onEdit(seller)}
+            style={{
+              padding: "6px 12px",
+              border: "1px solid #ddd",
+              borderRadius: "6px",
+              background: "#fff",
+              cursor: "pointer",
+              fontSize: "12px"
+            }}
+          >
+            ✏️ Editar
+          </button>
+          <button
+            onClick={() => onDelete(seller)}
+            style={{
+              padding: "6px 12px",
+              border: "1px solid #fcc",
+              borderRadius: "6px",
+              background: "#fff",
+              color: "#c00",
+              cursor: "pointer",
+              fontSize: "12px"
+            }}
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
+          <span>🎯 Meta: R$ {Number(seller.monthly_target || 0).toLocaleString()}</span>
+          <span>{progress.toFixed(0)}%</span>
+        </div>
+        <div style={{ 
+          height: "8px", 
+          background: "#eee", 
+          borderRadius: "4px",
+          overflow: "hidden"
+        }}>
+          <div style={{
+            height: "100%",
+            width: `${progress}%`,
+            background: progress >= 100 ? "#4caf50" : progress >= 50 ? "#ff9800" : "#0070f3",
+            transition: "width 0.3s ease"
+          }} />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", textAlign: "center" }}>
+        <div>
+          <div style={{ fontSize: "18px", fontWeight: "bold", color: "#333" }}>{stats.totalLeads}</div>
+          <div style={{ fontSize: "11px", color: "#666" }}>Leads</div>
+        </div>
+        <div>
+          <div style={{ fontSize: "18px", fontWeight: "bold", color: "#4caf50" }}>{stats.closedDeals}</div>
+          <div style={{ fontSize: "11px", color: "#666" }}>Ganhos</div>
+        </div>
+        <div>
+          <div style={{ fontSize: "18px", fontWeight: "bold", color: "#333" }}>R$ {stats.revenue.toLocaleString()}</div>
+          <div style={{ fontSize: "11px", color: "#666" }}>Receita</div>
+        </div>
+        <div>
+          <div style={{ fontSize: "18px", fontWeight: "bold", color: "#0070f3" }}>{stats.conversionRate}%</div>
+          <div style={{ fontSize: "11px", color: "#666" }}>Conversão</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Performance() {
+  const [leads, setLeads] = useState([]);
+  const [sellers, setSellers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingSeller, setEditingSeller] = useState(null);
+  const [deletingSeller, setDeletingSeller] = useState(null);
+
+  // Função para carregar dados
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      const [leadsResponse, sellersResponse] = await Promise.all([
+        leadsAPI.getAll(),
+        getSellers()
+      ]);
+
+      // Processar leads
+      let leadsData = [];
+      if (Array.isArray(leadsResponse)) {
+        leadsData = leadsResponse;
+      } else if (leadsResponse?.data && Array.isArray(leadsResponse.data)) {
+        leadsData = leadsResponse.data;
+      }
+
+      // Processar sellers
+      let sellersData = [];
+      if (Array.isArray(sellersResponse)) {
+        sellersData = sellersResponse;
+      } else if (sellersResponse?.data && Array.isArray(sellersResponse.data)) {
+        sellersData = sellersResponse.data;
+      }
+
+      setLeads(leadsData);
+      setSellers(sellersData);
+      
+    } catch (err) {
+      console.error("🚨 Erro ao carregar performance:", err);
+      setError(err.message || "Erro ao carregar dados");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Carregar dados na montagem
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Calcular estatísticas por vendedor
+  const calculateSellerStats = useCallback((seller) => {
+    const sellerLeads = leads.filter(lead => lead.seller_id === seller.id);
+    const totalLeads = sellerLeads.length;
+    const closedLeads = sellerLeads.filter(lead => lead.status === "ganho");
+    const revenue = closedLeads.reduce((acc, lead) => acc + Number(lead.value || 0), 0);
+    const conversionRate = totalLeads > 0 ? ((closedLeads.length / totalLeads) * 100).toFixed(1) : 0;
 
     return {
-      total,
-      gained,
-      lost,
-      avgConversion,
-      avgTimeToClose,
-      totalRevenue,
-      ranking
+      totalLeads,
+      closedDeals: closedLeads.length,
+      revenue,
+      conversionRate
     };
+  }, [leads]);
+
+  // handlers de CRUD
+  const handleAddSeller = () => {
+    setEditingSeller(null);
+    setModalOpen(true);
   };
 
-  const metrics = calculatePerformanceMetrics();
-
-  // Formatar moeda
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      maximumFractionDigits: 0
-    }).format(value);
+  const handleEditSeller = (seller) => {
+    setEditingSeller(seller);
+    setModalOpen(true);
   };
 
+  const handleSaveSeller = async (formData) => {
+    try {
+      if (editingSeller) {
+        // Editar vendedor existente
+        await updateSeller(editingSeller.id, {
+          name: formData.name,
+          email: formData.email,
+          monthly_target: formData.monthly_target
+        });
+      } else {
+        // Criar novo vendedor
+        await createSeller({
+          name: formData.name,
+          email: formData.email,
+          monthly_target: formData.monthly_target
+        });
+      }
+      // Recarregar dados
+      await loadData();
+    } catch (err) {
+      throw new Error(err.message || "Erro ao salvar vendedor");
+    }
+  };
+
+  const handleDeleteSeller = async (seller) => {
+    if (!confirm(`Tem certeza que deseja excluir o vendedor "${seller.name}"?`)) {
+      return;
+    }
+    
+    try {
+      await deleteSeller(seller.id);
+      await loadData();
+    } catch (err) {
+      alert("Erro ao deletar vendedor: " + err.message);
+    }
+  };
+
+  // Loading state
   if (loading) {
-    return <div className="loading">Carregando Performance...</div>;
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <div style={{ fontSize: "24px", marginBottom: "12px" }}>⏳</div>
+        <p>Carregando dados...</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        <div style={{ fontSize: "48px", marginBottom: "12px" }}>⚠️</div>
+        <p style={{ color: "#c00", marginBottom: "16px" }}>{error}</p>
+        <button 
+          onClick={loadData}
+          style={{
+            padding: "10px 20px",
+            border: "none",
+            borderRadius: "6px",
+            background: "#0070f3",
+            color: "#fff",
+            cursor: "pointer"
+          }}
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="performance-container">
-      {/* KPIs de Performance */}
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-value">{metrics.total}</div>
-          <div className="kpi-label">Total de Leads</div>
-        </div>
-        
-        <div className="kpi-card success">
-          <div className="kpi-value">{metrics.gained}</div>
-          <div className="kpi-label">Fechados</div>
-        </div>
-        
-        <div className="kpi-card danger">
-          <div className="kpi-value">{metrics.lost}</div>
-          <div className="kpi-label">Perdidos</div>
-        </div>
-        
-        <div className="kpi-card warning">
-          <div className="kpi-value">{metrics.avgConversion}%</div>
-          <div className="kpi-label">Conversão Média</div>
-        </div>
-        
-        <div className="kpi-card">
-          <div className="kpi-value">{metrics.avgTimeToClose}</div>
-          <div className="kpi-label">Dias Médios para Fechar</div>
-        </div>
-        
-        <div className="kpi-card success">
-          <div className="kpi-value">{formatCurrency(metrics.totalRevenue)}</div>
-          <div className="kpi-label">Receita Gerada</div>
-        </div>
+    <div style={{ padding: "20px" }}>
+      {/* Header com botão de adicionar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h2 style={{ margin: 0 }}>📈 Performance dos Vendedores</h2>
+        <button
+          onClick={handleAddSeller}
+          style={{
+            padding: "10px 20px",
+            border: "none",
+            borderRadius: "8px",
+            background: "#0070f3",
+            color: "#fff",
+            cursor: "pointer",
+            fontWeight: "500",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}
+        >
+          ➕ Adicionar Vendedor
+        </button>
       </div>
 
-      {/* Ranking Comercial */}
-      <div className="section">
-        <h3>Ranking Comercial</h3>
-        <div className="ranking-list">
-          {metrics.ranking.map((seller, index) => (
-            <div key={seller.id} className={`ranking-card rank-${index + 1}`}>
-              <div className="ranking-position">
-                {index === 0 && '🥇'}
-                {index === 1 && '🥈'}
-                {index === 2 && '🥉'}
-                {index > 2 && `#${index + 1}`}
-              </div>
-              <div className="ranking-info">
-                <div className="ranking-name">{seller.name}</div>
-                <div className="ranking-stats">
-                  <span>{seller.leads} leads</span>
-                  <span>•</span>
-                  <span>{seller.gained} ganhos</span>
-                  <span>•</span>
-                  <span>{seller.conversion}% conversão</span>
-                </div>
-              </div>
-              <div className="ranking-revenue">
-                {formatCurrency(seller.revenue)}
-              </div>
-              <div className="ranking-bar-container">
-                <div 
-                  className="ranking-bar" 
-                  style={{ 
-                    width: `${(seller.gained / Math.max(...metrics.ranking.map(s => s.gained))) * 100}%`
-                  }}
-                />
-              </div>
-            </div>
+      {/* KPIs Globais */}
+      <GlobalKPIs leads={leads} />
+
+      {/* Lista de vendedores */}
+      {sellers.length === 0 ? (
+        <div style={{ 
+          textAlign: "center", 
+          padding: "60px 20px",
+          background: "#f9f9f9",
+          borderRadius: "12px"
+        }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>👥</div>
+          <h3 style={{ margin: "0 0 8px", color: "#333" }}>Nenhum vendedor encontrado</h3>
+          <p style={{ color: "#666", marginBottom: "20px" }}>
+            Adicione vendedores para acompanhar sua performance
+          </p>
+          <button
+            onClick={handleAddSeller}
+            style={{
+              padding: "12px 24px",
+              border: "none",
+              borderRadius: "8px",
+              background: "#0070f3",
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: "500"
+            }}
+          >
+            ➕ Adicionar Primeiro Vendedor
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: "16px" }}>
+          {sellers.map(seller => (
+            <SellerCard
+              key={seller.id}
+              seller={seller}
+              stats={calculateSellerStats(seller)}
+              onEdit={handleEditSeller}
+              onDelete={handleDeleteSeller}
+            />
           ))}
         </div>
-      </div>
+      )}
 
-      {/* Comparativo Individual vs Média */}
-      <div className="section">
-        <h3>Comparativo: Individual vs Média</h3>
-        <div className="comparison-grid">
-          {metrics.ranking.map((seller) => {
-            const aboveAvg = parseFloat(seller.conversion) > parseFloat(metrics.avgConversion);
-            return (
-              <div key={seller.id} className="comparison-card">
-                <div className="comparison-header">
-                  <span className="comparison-name">{seller.name}</span>
-                  <span className={`comparison-badge ${aboveAvg ? 'positive' : 'negative'}`}>
-                    {aboveAvg ? '↑ Acima' : '↓ Abaixo'} da média
-                  </span>
-                </div>
-                <div className="comparison-stats">
-                  <div className="comparison-stat">
-                    <span className="stat-value">{seller.leads}</span>
-                    <span className="stat-label">Leads</span>
-                  </div>
-                  <div className="comparison-stat">
-                    <span className="stat-value">{seller.gained}</span>
-                    <span className="stat-label">Ganhos</span>
-                  </div>
-                  <div className="comparison-stat highlight">
-                    <span className="stat-value">{seller.conversion}%</span>
-                    <span className="stat-label">Conversão</span>
-                  </div>
-                </div>
-                <div className="comparison-bar">
-                  <div className="comparison-bar-label">Média da empresa: {metrics.avgConversion}%</div>
-                  <div className="comparison-bar-track">
-                    <div 
-                      className="comparison-bar-fill average" 
-                      style={{ width: `${metrics.avgConversion}%` }}
-                    />
-                    <div 
-                      className={`comparison-bar-fill individual ${aboveAvg ? 'positive' : 'negative'}`}
-                      style={{ left: `${Math.min(parseFloat(seller.conversion), 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Gráfico Comparativo */}
-      <div className="section">
-        <h3>Desempenho por Vendedor</h3>
-        <div className="performance-chart">
-          {metrics.ranking.map((seller) => {
-            const maxLeads = Math.max(...metrics.ranking.map(s => s.leads));
-            const maxGained = Math.max(...metrics.ranking.map(s => s.gained));
-            
-            return (
-              <div key={seller.id} className="chart-row">
-                <div className="chart-label">{seller.name}</div>
-                <div className="chart-bars">
-                  <div className="chart-bar-group">
-                    <div 
-                      className="chart-bar leads"
-                      style={{ width: `${(seller.leads / maxLeads) * 100}%` }}
-                      title={`${seller.leads} Leads`}
-                    >
-                      <span className="bar-tooltip">{seller.leads}</span>
-                    </div>
-                    <span className="bar-label">Leads</span>
-                  </div>
-                  <div className="chart-bar-group">
-                    <div 
-                      className="chart-bar gained"
-                      style={{ width: `${(seller.gained / maxGained) * 100}%` }}
-                      title={`${seller.gained} Ganhos`}
-                    >
-                      <span className="bar-tooltip">{seller.gained}</span>
-                    </div>
-                    <span className="bar-label">Ganhos</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="chart-legend">
-          <span><span className="legend-dot leads"></span>Leads</span>
-          <span><span className="legend-dot gained"></span>Ganhos</span>
-        </div>
-      </div>
+      {/* Modal de adicionar/editar */}
+      <SellerModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={handleSaveSeller}
+        seller={editingSeller}
+        isEditing={!!editingSeller}
+      />
     </div>
   );
 }
