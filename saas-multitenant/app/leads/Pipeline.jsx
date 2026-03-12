@@ -12,11 +12,13 @@ export default function Pipeline() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [activities, setActivities] = useState([]);
   const [inactiveLeads, setInactiveLeads] = useState([]);
+  const [warmLeads, setWarmLeads] = useState([]);
   const [activityForm, setActivityForm] = useState({
     type: 'followup',
     description: '',
     due_date: ''
   });
+  const [showActionMenu, setShowActionMenu] = useState(null); // ID do lead com menu aberto
 
   const stages = [
     { key: 'novo', label: 'Novo', color: '#3B82F6' },
@@ -38,12 +40,24 @@ export default function Pipeline() {
       const leadsData = await leadsAPI.getAll();
       setLeads(leadsData);
       
-      // Carregar leads inativos (sem atividade há 7 dias)
+      // Carregar leads inativos (>7 dias sem atividade)
       try {
         const inactive = await targetsAPI.getInactiveLeads(7);
-        setInactiveLeads(inactive);
+        setInactiveLeads(inactive || []);
       } catch (e) {
         console.log('Leads inativos não disponíveis');
+        setInactiveLeads([]);
+      }
+      
+      // Carregar leads mornos (3-7 dias sem atividade)
+      try {
+        const warm = await targetsAPI.getInactiveLeads(3);
+        // Filtrar para mostrar apenas os que têm entre 3-7 dias
+        const warmFiltered = (warm || []).filter(l => l.days_inactive >= 3 && l.days_inactive < 7);
+        setWarmLeads(warmFiltered);
+      } catch (e) {
+        console.log('Leads mornos não disponíveis');
+        setWarmLeads([]);
       }
     } catch (err) {
       console.error('Erro ao carregar leads:', err);
@@ -63,6 +77,7 @@ export default function Pipeline() {
   const handleDragStart = (e, lead) => {
     setDraggedLead(lead);
     e.dataTransfer.effectAllowed = 'move';
+    setShowActionMenu(null); // Fechar menu ao arrastar
   };
 
   const handleDragOver = (e) => {
@@ -106,9 +121,45 @@ export default function Pipeline() {
   };
 
   const getLeadTemperature = (score) => {
-    if (score >= 30) return { label: 'Quente', emoji: '🔥', color: '#EF4444' };
-    if (score >= 15) return { label: 'Morno', emoji: '🟡', color: '#F59E0B' };
-    return { label: 'Frio', emoji: '❄️', color: '#3B82F6' };
+    if (score >= 30) return { label: 'Quente', color: '#EF4444' };
+    if (score >= 15) return { label: 'Morno', color: '#F59E0B' };
+    return { label: 'Frio', color: '#3B82F6' };
+  };
+
+  // ========== AÇÕES RÁPIDAS ==========
+  const handleQuickCall = (lead) => {
+    if (lead.phone) {
+      window.location.href = `tel:${lead.phone}`;
+    } else {
+      alert('Este lead não possui telefone cadastrado');
+    }
+    setShowActionMenu(null);
+  };
+
+  const handleQuickEmail = (lead) => {
+    if (lead.email) {
+      window.location.href = `mailto:${lead.email}`;
+    } else {
+      alert('Este lead não possui email cadastrado');
+    }
+    setShowActionMenu(null);
+  };
+
+  const handleScheduleFollowup = (lead) => {
+    openActivityModal(lead);
+    setActivityForm({ ...activityForm, type: 'followup' });
+    setShowActionMenu(null);
+  };
+
+  const handleQuickWhatsApp = (lead) => {
+    if (lead.phone) {
+      // Limpar telefone eformatar para WhatsApp
+      const phone = lead.phone.replace(/\D/g, '');
+      window.open(`https://wa.me/${phone}`, '_blank');
+    } else {
+      alert('Este lead não possui telefone cadastrado');
+    }
+    setShowActionMenu(null);
   };
 
   // ========== ATIVIDADES ==========
@@ -120,7 +171,7 @@ export default function Pipeline() {
     // Carregar atividades do lead
     try {
       const leadActivities = await targetsAPI.getLeadActivities(lead.id);
-      setActivities(leadActivities);
+      setActivities(leadActivities || []);
     } catch (e) {
       setActivities([]);
     }
@@ -140,7 +191,7 @@ export default function Pipeline() {
       
       // Recarregar atividades
       const leadActivities = await targetsAPI.getLeadActivities(selectedLead.id);
-      setActivities(leadActivities);
+      setActivities(leadActivities || []);
       setActivityForm({ type: 'followup', description: '', due_date: '' });
       
       alert('Atividade criada com sucesso!');
@@ -156,7 +207,7 @@ export default function Pipeline() {
       
       // Recarregar atividades
       const leadActivities = await targetsAPI.getLeadActivities(selectedLead.id);
-      setActivities(leadActivities);
+      setActivities(leadActivities || []);
     } catch (err) {
       console.error('Erro ao completar atividade:', err);
     }
@@ -192,11 +243,11 @@ export default function Pipeline() {
 
   const getActivityTypeLabel = (type) => {
     const labels = {
-      ligacao: '📞 Ligação',
-      email: '📧 Email',
-      reuniao: '📅 Reunião',
-      followup: '🔄 Follow-up',
-      tarefa: '✅ Tarefa'
+      ligacao: 'Ligacao',
+      email: 'Email',
+      reuniao: 'Reuniao',
+      followup: 'Follow-up',
+      tarefa: 'Tarefa'
     };
     return labels[type] || type;
   };
@@ -207,21 +258,86 @@ export default function Pipeline() {
 
   return (
     <div className="pipeline-container">
-      {/* ========== LEADS INATIVOS (ALERTA) ========== */}
-      {inactiveLeads.length > 0 && (
-        <div className="alert-box warning">
-          <div className="alert-header">
-            <span>⚠️ Leads sem atividade há 7+ dias</span>
-            <span className="alert-count">{inactiveLeads.length}</span>
-          </div>
-          <div className="alert-list">
-            {inactiveLeads.slice(0, 5).map(lead => (
-              <div key={lead.id} className="alert-item">
-                <span className="alert-name">{lead.name}</span>
-                <span className="alert-days">{Math.floor(lead.days_inactive)} dias</span>
+      {/* ========== ALERTAS DE LEADS QUENTES E INATIVOS ========== */}
+      {(warmLeads.length > 0 || inactiveLeads.length > 0) && (
+        <div style={{ marginBottom: '24px' }}>
+          {/* Leads Inativos (>7 dias) */}
+          {inactiveLeads.length > 0 && (
+            <div className="alert-box danger" style={{ marginBottom: '12px' }}>
+              <div className="alert-header">
+                <span>🚨 Leads Inativos (7+ dias sem interação)</span>
+                <span className="alert-count" style={{ background: '#ef4444' }}>{inactiveLeads.length}</span>
               </div>
-            ))}
-          </div>
+              <div className="alert-list">
+                {inactiveLeads.slice(0, 5).map(lead => (
+                  <div key={lead.id} className="alert-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span className="alert-name">{lead.name}</span>
+                      <span className="alert-days" style={{ marginLeft: '12px' }}>{Math.floor(lead.days_inactive || 0)} dias</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {lead.phone && (
+                        <button 
+                          className="btn-small"
+                          onClick={() => handleQuickCall(lead)}
+                          title="Ligar"
+                        >
+                          📞
+                        </button>
+                      )}
+                      <button 
+                        className="btn-small"
+                        onClick={() => handleScheduleFollowup(lead)}
+                        title="Agendar Follow-up"
+                      >
+                        📅 Agendar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Leads Mornos (3-7 dias) */}
+          {warmLeads.length > 0 && (
+            <div className="alert-box warning">
+              <div className="alert-header">
+                <span>🔥 Leads Quentes (Atenção necessária)</span>
+                <span className="alert-count">{warmLeads.length}</span>
+              </div>
+              <div className="alert-list">
+                {warmLeads.slice(0, 5).map(lead => (
+                  <div key={lead.id} className="alert-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span className="alert-name">{lead.name}</span>
+                      <span className="alert-days" style={{ marginLeft: '12px', color: '#f59e0b' }}>
+                        {Math.floor(lead.days_inactive || 0)} dias
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {lead.phone && (
+                        <button 
+                          className="btn-small"
+                          onClick={() => handleQuickCall(lead)}
+                          title="Ligar"
+                        >
+                          📞
+                        </button>
+                      )}
+                      <button 
+                        className="btn-small"
+                        onClick={() => handleScheduleFollowup(lead)}
+                        title="Agendar Follow-up"
+                      >
+                        📅
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -295,10 +411,11 @@ export default function Pipeline() {
                       className="kanban-card"
                       draggable
                       onDragStart={(e) => handleDragStart(e, lead)}
+                      style={{ position: 'relative' }}
                     >
                       {/* Badge de Temperatura */}
                       <div className="kanban-card-temp" style={{ backgroundColor: temp.color }}>
-                        {temp.emoji}
+                        {temp.label}
                       </div>
                       
                       <div className="kanban-card-name">{lead.name}</div>
@@ -311,14 +428,45 @@ export default function Pipeline() {
                         </span>
                       </div>
                       
-                      {/* Botão de Atividade */}
-                      <button 
-                        className="kanban-card-action"
-                        onClick={() => openActivityModal(lead)}
-                        title="Adicionar Atividade"
-                      >
-                        📋 Tarefa
-                      </button>
+                      {/* Botões de Ação Rápida */}
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                        {lead.phone && (
+                          <button 
+                            className="kanban-card-action"
+                            onClick={() => handleQuickCall(lead)}
+                            title="Ligar"
+                            style={{ flex: '1 1 auto', minWidth: '40px' }}
+                          >
+                            📞
+                          </button>
+                        )}
+                        <button 
+                          className="kanban-card-action"
+                          onClick={() => handleQuickEmail(lead)}
+                          title="Enviar Email"
+                          style={{ flex: '1 1 auto', minWidth: '40px' }}
+                        >
+                          📧
+                        </button>
+                        <button 
+                          className="kanban-card-action"
+                          onClick={() => handleScheduleFollowup(lead)}
+                          title="Agendar Follow-up"
+                          style={{ flex: '1 1 auto', minWidth: '40px' }}
+                        >
+                          📅
+                        </button>
+                        {lead.phone && (
+                          <button 
+                            className="kanban-card-action"
+                            onClick={() => handleQuickWhatsApp(lead)}
+                            title="WhatsApp"
+                            style={{ flex: '1 1 auto', minWidth: '40px', background: '#25D366', borderColor: '#25D366', color: '#fff' }}
+                          >
+                            💬
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -336,6 +484,35 @@ export default function Pipeline() {
         <div className="modal-overlay" onClick={() => setShowActivityModal(false)}>
           <div className="modal large" onClick={e => e.stopPropagation()}>
             <h3>📋 Atividades - {selectedLead.name}</h3>
+            
+            {/* Botões de ação rápida no modal */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              {selectedLead.phone && (
+                <button 
+                  className="btn-primary"
+                  onClick={() => handleQuickCall(selectedLead)}
+                  style={{ flex: '1' }}
+                >
+                  📞 Ligar Agora
+                </button>
+              )}
+              <button 
+                className="btn-primary"
+                onClick={() => handleQuickEmail(selectedLead)}
+                style={{ flex: '1' }}
+              >
+                📧 Enviar Email
+              </button>
+              {selectedLead.phone && (
+                <button 
+                  className="btn-primary"
+                  onClick={() => handleQuickWhatsApp(selectedLead)}
+                  style={{ flex: '1', background: '#25D366' }}
+                >
+                  💬 WhatsApp
+                </button>
+              )}
+            </div>
             
             {/* Formulário de nova atividade */}
             <form onSubmit={handleCreateActivity} className="activity-form">

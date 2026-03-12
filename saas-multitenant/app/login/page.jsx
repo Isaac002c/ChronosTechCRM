@@ -16,8 +16,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Usar o endpoint correto do backend Express (porta 3000)
-      const response = await fetch('http://localhost:3000/auth/login', {
+      // Usar o endpoint correto do backend Express (porta 5000)
+      const response = await fetch('http://localhost:5000/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,18 +60,18 @@ export default function Login() {
       }
 
       // Salvar dados do usuário no localStorage para uso no frontend
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const userData = {
+        ...data.user,
+        role: data.user.role || 'admin'
+      };
+      localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('tenant', JSON.stringify(data.tenant));
       
-      // Also save tenantId directly - CRITICAL for API calls
-      const tenantIdValue = data.tenant?.id || data.tenant?.tenant_id || '';
+      // Salvar tenantId para chamadas de API
+      const tenantIdValue = data.tenant?.id || '';
       localStorage.setItem('tenantId', tenantIdValue);
-      localStorage.setItem('tenant-id', tenantIdValue);
-      
-      // Also save in cookie for redundancy
-      document.cookie = `tenant-id=${tenantIdValue}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
 
-      console.log('[Login] Saved tenantId:', tenantIdValue);
+      console.log('[Login] Login realizado com sucesso!');
 
       // Redirecionar para o dashboard
       router.push('/dashboard');
@@ -107,7 +107,7 @@ export default function Login() {
             color: '#3b82f6',
             marginBottom: '8px'
           }}>
-            ChronosTech
+            ChronosTek
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '14px' }}>
             CRM Multitenant
@@ -211,10 +211,7 @@ export default function Login() {
           color: '#64748b',
           fontSize: '13px'
         }}>
-          Não tem uma conta?{' '}
-          <a href="/register" style={{ color: '#3b82f6' }}>
-            Criar conta
-          </a>
+          Sistema ChronosTek CRM
         </p>
       </div>
     </div>

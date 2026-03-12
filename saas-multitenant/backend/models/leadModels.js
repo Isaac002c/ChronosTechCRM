@@ -1,5 +1,35 @@
 const pool = require('../config/db');
 
+// Helper function to build WHERE clause based on filter
+const buildWhereClause = (filter) => {
+  const conditions = [];
+  const params = [];
+  let paramIndex = 1;
+  
+  // Always filter by tenant
+  if (filter.tenantId) {
+    conditions.push(`tenant_id = $${paramIndex}`);
+    params.push(filter.tenantId);
+    paramIndex++;
+  }
+  
+  // Filter by seller (for non-admin users)
+  if (filter.sellerId) {
+    conditions.push(`seller_id = $${paramIndex}`);
+    params.push(filter.sellerId);
+    paramIndex++;
+  }
+  
+  if (conditions.length === 0) {
+    return { clause: '', params };
+  }
+  
+  return {
+    clause: 'WHERE ' + conditions.join(' AND '),
+    params
+  };
+};
+
 // CREATE - Criar novo lead
 const createLead = async ({ name, email, phone, company, value, status, source, stage, tenant_id, seller_id }) => {
     // DEBUG: Log para identificar o problema
@@ -25,7 +55,17 @@ const createLead = async ({ name, email, phone, company, value, status, source, 
     return result.rows[0];
 };
 
-// READ - Listar todos os leads do tenant
+// READ - Listar todos os leads do tenant (com filtro)
+const getLeadsByFilter = async (filter) => {
+    const { clause, params } = buildWhereClause(filter);
+    const result = await pool.query(
+        `SELECT * FROM leads ${clause} ORDER BY created_at DESC`,
+        params
+    );
+    return result.rows;
+};
+
+// READ - Listar todos os leads do tenant (legacy - para compatibilidade)
 const getAllLeads = async (tenant_id) => {
     const result = await pool.query(
         'SELECT * FROM leads WHERE tenant_id = $1 ORDER BY created_at DESC',
@@ -63,30 +103,33 @@ const deleteLead = async (id, tenant_id) => {
     return result.rows[0];
 };
 
-// READ - Contar leads por status (para métricas)
-const getLeadsCountByStatus = async (tenant_id) => {
+// READ - Contar leads por status (com filtro)
+const getLeadsCountByStatus = async (filter) => {
+    const { clause, params } = buildWhereClause(filter);
     const result = await pool.query(
         `SELECT status, COUNT(*) as count, SUM(COALESCE(value, 0)) as total_value
-         FROM leads WHERE tenant_id = $1 
+         FROM leads ${clause} 
          GROUP BY status`,
-        [tenant_id]
+        params
     );
     return result.rows;
 };
 
-// READ - Contar leads por origem
-const getLeadsCountBySource = async (tenant_id) => {
+// READ - Contar leads por origem (com filtro)
+const getLeadsCountBySource = async (filter) => {
+    const { clause, params } = buildWhereClause(filter);
     const result = await pool.query(
         `SELECT source, COUNT(*) as count, SUM(COALESCE(value, 0)) as total_value
-         FROM leads WHERE tenant_id = $1 
+         FROM leads ${clause} 
          GROUP BY source`,
-        [tenant_id]
+        params
     );
     return result.rows;
 };
 
-// READ - Métricas financeiras do pipeline
-const getPipelineMetrics = async (tenant_id) => {
+// READ - Métricas financeiras do pipeline (com filtro)
+const getPipelineMetrics = async (filter) => {
+    const { clause, params } = buildWhereClause(filter);
     const result = await pool.query(
         `SELECT 
             COUNT(*) as total_leads,
@@ -98,14 +141,15 @@ const getPipelineMetrics = async (tenant_id) => {
             COUNT(CASE WHEN status = 'qualificado' THEN 1 END) as qualified_leads,
             COUNT(CASE WHEN status = 'proposta' THEN 1 END) as proposal_leads,
             COUNT(CASE WHEN status = 'negociacao' THEN 1 END) as negotiation_leads
-         FROM leads WHERE tenant_id = $1 AND status NOT IN ('ganho', 'perdido')`,
-        [tenant_id]
+         FROM leads ${clause} AND status NOT IN ('ganho', 'perdido')`,
+        params
     );
     return result.rows[0];
 };
 
-// READ - Métricas mensais (para histórico)
-const getMonthlyMetrics = async (tenant_id, months = 12) => {
+// READ - Métricas mensais (para histórico) (com filtro)
+const getMonthlyMetrics = async (filter, months = 12) => {
+    const { clause, params } = buildWhereClause(filter);
     const result = await pool.query(
         `SELECT 
             TO_CHAR(created_at, 'YYYY-MM') as month,
@@ -113,18 +157,37 @@ const getMonthlyMetrics = async (tenant_id, months = 12) => {
             COUNT(CASE WHEN status = 'ganho' THEN 1 END) as gained_leads,
             SUM(CASE WHEN status = 'ganho' THEN COALESCE(value, 0) END) as revenue,
             SUM(COALESCE(value, 0)) as pipeline_value
-         FROM leads 
-         WHERE tenant_id = $1 
-         AND created_at >= NOW() - INTERVAL '${months} months'
+         FROM leads ${clause} AND created_at >= NOW() - INTERVAL '${months} months'
          GROUP BY TO_CHAR(created_at, 'YYYY-MM')
          ORDER BY month ASC`,
-        [tenant_id]
+        params
+    );
+    return result.rows;
+};
+
+// READ - Leads inativos (sem atividade há X dias) (com filtro)
+const getInactiveLeads = async (filter, days = 7) => {
+    const { clause, params } = buildWhereClause(filter);
+    const result = await pool.query(
+        `SELECT 
+            l.*,
+            MAX(la.created_at) as last_activity,
+            EXTRACT(DAY FROM NOW() - MAX(la.created_at)) as days_inactive
+         FROM leads l
+         LEFT JOIN lead_activities la ON l.id = la.lead_id
+         ${clause}
+         GROUP BY l.id
+         HAVING MAX(la.created_at) IS NULL OR EXTRACT(DAY FROM NOW() - MAX(la.created_at)) > $${params.length + 1}
+         ORDER BY days_inactive DESC
+         LIMIT 20`,
+        [...params, days]
     );
     return result.rows;
 };
 
 module.exports = {
     createLead,
+    getLeadsByFilter,
     getAllLeads,
     getLeadById,
     updateLead,
@@ -132,6 +195,7 @@ module.exports = {
     getLeadsCountByStatus,
     getLeadsCountBySource,
     getPipelineMetrics,
-    getMonthlyMetrics
+    getMonthlyMetrics,
+    getInactiveLeads
 };
 

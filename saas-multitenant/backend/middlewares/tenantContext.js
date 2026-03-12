@@ -15,9 +15,12 @@ module.exports = function tenantContext(req, res, next) {
       token = authHeader.split(' ')[1];
     }
 
-    // 2️⃣ Cookie
+    // 2️⃣ Cookie - suporta ambos 'token' e 'auth-token'
     else if (req.cookies?.token) {
       token = req.cookies.token;
+    }
+    else if (req.cookies?.['auth-token']) {
+      token = req.cookies['auth-token'];
     }
 
     // 3️⃣ Query string (opcional)
@@ -34,7 +37,7 @@ module.exports = function tenantContext(req, res, next) {
     // 5️⃣ Decodifica e verifica token
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+decoded = jwt.verify(token, process.env.JWT_SECRET || 'sua-chave-super-secreta-crm');
     } catch (err) {
       console.warn('[tenantContext] Token inválido ou expirado:', err.message);
       return res.status(401).json({ error: 'Token inválido ou expirado.' });
@@ -46,15 +49,19 @@ module.exports = function tenantContext(req, res, next) {
       return res.status(401).json({ error: 'Tenant inválido.' });
     }
 
-    // 7️⃣ Popula request
+    // 7️⃣ Popula request com informações do usuário
     req.tenantId = String(decoded.tenantId);
     req.userId = decoded.userId || null;
     req.userEmail = decoded.email || null;
+    req.userRole = decoded.role || 'seller'; // padrão: seller
+    req.sellerId = decoded.sellerId || null; // ID do vendedor vinculado
 
     console.log('[tenantContext] JWT Decoded:', {
       userId: req.userId,
       tenantId: req.tenantId,
       email: req.userEmail,
+      role: req.userRole,
+      sellerId: req.sellerId
     });
 
     next();

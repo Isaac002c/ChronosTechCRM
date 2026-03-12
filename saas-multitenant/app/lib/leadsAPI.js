@@ -29,6 +29,40 @@ const getAuthHeaders = () => {
   };
 };
 
+// Função para obter informações do usuário logado (inclui role)
+export const getCurrentUser = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/validate`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include'
+    });
+    
+    const text = await response.text();
+    
+    if (!response.ok) {
+      let errorMessage = `Erro HTTP: ${response.status}`;
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        if (text) errorMessage = text;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    if (!text || text.trim() === '') {
+      return null;
+    }
+    
+    const data = JSON.parse(text);
+    return data;
+  } catch (err) {
+    console.error('[leadsAPI] getCurrentUser error:', err);
+    throw err;
+  }
+};
+
 export const leadsAPI = {
   // GET /api/leads - Listar todos os leads
   getAll: async () => {
@@ -163,6 +197,39 @@ export const leadsAPI = {
     } catch (err) {
       console.error('[leadsAPI] getMonthlyMetrics error:', err);
       throw err;
+    }
+  },
+
+  // GET /api/leads/inactive/:days - Leads inativos
+  getInactiveLeads: async (days = 7) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/leads/inactive/${days}`, {
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+      
+      const text = await response.text();
+      
+      if (!response.ok) {
+        let errorMessage = `Erro HTTP: ${response.status}`;
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (e) {
+          if (text) errorMessage = text;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      if (!text || text.trim() === '') {
+        return [];
+      }
+      
+      const data = JSON.parse(text);
+      return data.data || [];
+    } catch (err) {
+      console.error('[leadsAPI] getInactiveLeads error:', err);
+      return []; // Retorna array vazio em vez de erro
     }
   },
 

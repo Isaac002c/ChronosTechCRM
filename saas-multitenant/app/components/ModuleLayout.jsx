@@ -4,35 +4,25 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const moduleTabs = {
   leads: [
-    { key: 'overview', label: 'Overview', icon: '📊' },
-    { key: 'acquisition', label: 'Acquisition', icon: '🎯' },
-    { key: 'pipeline', label: 'Pipeline', icon: '🔄' },
-    { key: 'performance', label: 'Performance', icon: '📈' },
-    { key: 'reports', label: 'Reports', icon: '📑' },
+    { key: 'overview', label: 'Overview' },
+    { key: 'acquisition', label: 'Acquisition' },
+    { key: 'pipeline', label: 'Pipeline' },
+    { key: 'leaderboard', label: 'Ranking' },
+    { key: 'performance', label: 'Performance' },
+    { key: 'export', label: 'Exportar' },
+    { key: 'reports', label: 'Reports' },
   ],
-  deals: [
-    { key: 'overview', label: 'Overview', icon: '📊' },
-    { key: 'pipeline', label: 'Pipeline', icon: '🔄' },
-    { key: 'performance', label: 'Performance', icon: '📈' },
-  ],
-  companies: [
-    { key: 'overview', label: 'Overview', icon: '📊' },
-    { key: 'list', label: 'Lista', icon: '📋' },
-  ],
-  tasks: [
-    { key: 'overview', label: 'Overview', icon: '📊' },
-    { key: 'kanban', label: 'Kanban', icon: '✅' },
-    { key: 'calendar', label: 'Calendário', icon: '📅' },
-  ],
-  reports: [
-    { key: 'overview', label: 'Overview', icon: '📊' },
-    { key: 'analytics', label: 'Analytics', icon: '📈' },
-    { key: 'forecasts', label: 'Previsões', icon: '🔮' },
+  multas: [
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'clients', label: 'Clientes' },
+    { key: 'contracts', label: 'Multas' },
+    { key: 'documents', label: 'Documentos' },
+    { key: 'history', label: 'Historico' },
   ],
   settings: [
-    { key: 'general', label: 'Geral', icon: '⚙️' },
-    { key: 'team', label: 'Equipe', icon: '👥' },
-    { key: 'integrations', label: 'Integrações', icon: '🔗' },
+    { key: 'general', label: 'Geral' },
+    { key: 'team', label: 'Equipe' },
+    { key: 'integrations', label: 'Integracoes' },
   ],
 };
 
@@ -46,7 +36,18 @@ export default function ModuleLayout({
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const currentTab = externalActiveTab || searchParams.get('tab') || 'overview';
+  // Obter aba padrão baseada no módulo
+  const getDefaultTab = (module) => {
+    const defaults = {
+      leads: 'overview',
+      multas: 'dashboard',
+      settings: 'general'
+    };
+    return defaults[module] || 'overview';
+  };
+  
+  const defaultTab = getDefaultTab(moduleKey);
+  const currentTab = externalActiveTab || searchParams.get('tab') || defaultTab;
   const tabs = moduleTabs[moduleKey] || moduleTabs.leads;
 
   const handleTabChange = (tabKey) => {
@@ -72,7 +73,6 @@ export default function ModuleLayout({
             className={`module-tab ${currentTab === tab.key ? 'active' : ''}`}
             onClick={() => handleTabChange(tab.key)}
           >
-            <span className="tab-icon">{tab.icon}</span>
             {tab.label}
           </button>
         ))}
@@ -85,4 +85,3 @@ export default function ModuleLayout({
     </div>
   );
 }
-

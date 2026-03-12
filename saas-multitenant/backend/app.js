@@ -19,6 +19,19 @@ const assetRoutes = require('./routes/assetsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const targetsRoutes = require('./routes/targetsRoutes');
 const sellersRoutes = require('./routes/sellersRoutes');
+const forecastRoutes = require('./routes/forecastRoutes');
+
+// Novas rotas do módulo de multas
+const clientRoutes = require('./routes/clientRoutes');
+const contractRoutes = require('./routes/contractRoutes');
+const documentRoutes = require('./routes/documentRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
+
+// Rotas SaaS
+const saasRoutes = require('./routes/saasRoutes');
+
+// Rotas de gerenciamento de usuários
+const userManagementRoutes = require('./routes/userManagementRoutes');
 
 const app = express();
 
@@ -72,8 +85,21 @@ app.use('/api', tenantContext);
 app.use('/api/leads', leadsRoutes);
 app.use('/api/targets', targetsRoutes);
 app.use('/api/sellers', sellersRoutes);
+app.use('/api/forecast', forecastRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/webhooks', webhookRoutes);
+
+// Rotas do módulo de multas
+app.use('/api/clients', clientRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/services', serviceRoutes);
+
+// Rotas SaaS
+app.use('/api', saasRoutes);
+
+// Rotas de gerenciamento de usuários
+app.use('/api/users/management', userManagementRoutes);
 
 // ============================================
 // 404 Handler

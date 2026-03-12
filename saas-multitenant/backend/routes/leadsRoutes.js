@@ -2,25 +2,51 @@ const express = require('express');
 const router = express.Router();
 const leadModel = require('../models/leadModels');
 
-// GET /api/leads - Listar todos os leads do tenant
+// Helper function to build the filter based on user role
+const buildLeadFilter = (tenantId, userRole, sellerId) => {
+  // Admin sees all leads in tenant
+  if (userRole === 'admin') {
+    return { tenantId };
+  }
+  
+  // Seller sees only their assigned leads
+  return { 
+    tenantId,
+    sellerId  // Only leads where seller_id matches
+  };
+};
+
+// GET /api/leads - Listar todos os leads do tenant (filtrado por role)
 router.get('/', async (req, res) => {
     try {
         const tenantId = req.tenantId;
-        const leads = await leadModel.getAllLeads(tenantId);
-        res.json({ success: true, data: leads });
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        
+        console.log('[leadsRoutes] GET / - tenantId:', tenantId, 'role:', userRole, 'sellerId:', sellerId);
+        
+        const filter = buildLeadFilter(tenantId, userRole, sellerId);
+        const leads = await leadModel.getLeadsByFilter(filter);
+        
+        res.json({ success: true, data: leads, meta: { role: userRole } });
     } catch (err) {
         console.error('Erro ao buscar leads:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// GET /api/leads/stats - Métricas de leads
+// GET /api/leads/stats - Métricas de leads (filtrado por role)
 router.get('/stats', async (req, res) => {
     try {
         const tenantId = req.tenantId;
-        const byStatus = await leadModel.getLeadsCountByStatus(tenantId);
-        const bySource = await leadModel.getLeadsCountBySource(tenantId);
-        const allLeads = await leadModel.getAllLeads(tenantId);
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        
+        const filter = buildLeadFilter(tenantId, userRole, sellerId);
+        
+        const byStatus = await leadModel.getLeadsCountByStatus(filter);
+        const bySource = await leadModel.getLeadsCountBySource(filter);
+        const allLeads = await leadModel.getLeadsByFilter(filter);
         
         res.json({
             success: true,
@@ -28,7 +54,8 @@ router.get('/stats', async (req, res) => {
                 total: allLeads.length,
                 byStatus,
                 bySource
-            }
+            },
+            meta: { role: userRole }
         });
     } catch (err) {
         console.error('Erro ao buscar stats:', err);
@@ -36,40 +63,76 @@ router.get('/stats', async (req, res) => {
     }
 });
 
-// GET /api/leads/pipeline - Métricas financeiras do pipeline
+// GET /api/leads/pipeline - Métricas financeiras do pipeline (filtrado por role)
 router.get('/pipeline', async (req, res) => {
     try {
         const tenantId = req.tenantId;
-        const metrics = await leadModel.getPipelineMetrics(tenantId);
-        res.json({ success: true, data: metrics });
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        
+        const filter = buildLeadFilter(tenantId, userRole, sellerId);
+        const metrics = await leadModel.getPipelineMetrics(filter);
+        
+        res.json({ success: true, data: metrics, meta: { role: userRole } });
     } catch (err) {
         console.error('Erro ao buscar pipeline:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// GET /api/leads/monthly - Métricas mensais (histórico)
+// GET /api/leads/monthly - Métricas mensais (histórico) (filtrado por role)
 router.get('/monthly', async (req, res) => {
     try {
         const tenantId = req.tenantId;
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
         const months = parseInt(req.query.months) || 12;
-        const metrics = await leadModel.getMonthlyMetrics(tenantId, months);
-        res.json({ success: true, data: metrics });
+        
+        const filter = buildLeadFilter(tenantId, userRole, sellerId);
+        const metrics = await leadModel.getMonthlyMetrics(filter, months);
+        
+        res.json({ success: true, data: metrics, meta: { role: userRole } });
     } catch (err) {
         console.error('Erro ao buscar métricas mensais:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// GET /api/leads/:id - Buscar lead por ID
+// GET /api/leads/inactive - Leads inativos (filtrado por role)
+router.get('/inactive/:days', async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        const days = parseInt(req.params.days) || 7;
+        
+        const filter = buildLeadFilter(tenantId, userRole, sellerId);
+        const inactiveLeads = await leadModel.getInactiveLeads(filter, days);
+        
+        res.json({ success: true, data: inactiveLeads });
+    } catch (err) {
+        console.error('Erro ao buscar leads inativos:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// GET /api/leads/:id - Buscar lead por ID (filtrado por role)
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.tenantId;
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        
         const lead = await leadModel.getLeadById(id, tenantId);
         
         if (!lead) {
             return res.status(404).json({ success: false, error: 'Lead não encontrado' });
+        }
+        
+        // Verificar se o seller tem acesso a este lead
+        if (userRole === 'seller' && sellerId && lead.seller_id !== sellerId) {
+            return res.status(403).json({ success: false, error: 'Acesso negado a este lead' });
         }
         
         res.json({ success: true, data: lead });
@@ -98,6 +161,11 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Nome e email são obrigatórios' });
         }
         
+        // Se for seller, automaticamente atribui o lead a ele mesmo
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        const assignedSellerId = userRole === 'seller' ? sellerId : (seller_id || null);
+        
         const lead = await leadModel.createLead({
             name,
             email,
@@ -108,7 +176,7 @@ router.post('/', async (req, res) => {
             source,
             stage: stage || 'lead',
             tenant_id: tenantId,
-            seller_id: seller_id || null
+            seller_id: assignedSellerId
         });
         
         res.status(201).json({ success: true, data: lead });
@@ -124,6 +192,20 @@ router.put('/:id', async (req, res) => {
         const { id } = req.params;
         const { name, email, phone, company, value, status, source, stage, seller_id } = req.body;
         const tenantId = req.tenantId;
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        
+        // Verificar se o lead existe e se o seller tem acesso
+        const existingLead = await leadModel.getLeadById(id, tenantId);
+        
+        if (!existingLead) {
+            return res.status(404).json({ success: false, error: 'Lead não encontrado' });
+        }
+        
+        // Verificar permissão (admin pode editar qualquer lead, seller só pode editar seus próprios)
+        if (userRole === 'seller' && sellerId && existingLead.seller_id !== sellerId) {
+            return res.status(403).json({ success: false, error: 'Acesso negado a este lead' });
+        }
         
         const lead = await leadModel.updateLead(id, {
             name,
@@ -153,6 +235,13 @@ router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.tenantId;
+        const userRole = req.userRole || 'seller';
+        const sellerId = req.sellerId;
+        
+        // Verificar permissão (apenas admin pode deletar)
+        if (userRole !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Apenas administradores podem excluir leads' });
+        }
         
         const lead = await leadModel.deleteLead(id, tenantId);
         

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import leadsAPI from '../lib/leadsAPI';
 import targetsAPI from '../lib/targetsAPI';
+import forecastAPI from '../lib/forecastAPI';
 
 export default function LeadsOverview() {
   const [leads, setLeads] = useState([]);
@@ -15,6 +16,18 @@ export default function LeadsOverview() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showTargetModal, setShowTargetModal] = useState(false);
   const [targetForm, setTargetForm] = useState({ month: new Date().getMonth() + 1, target_value: 0 });
+  const [showForecastModal, setShowForecastModal] = useState(false);
+  const [forecastConfig, setForecastConfig] = useState([]);
+  const [forecastForm, setForecastForm] = useState([]);
+  const [visibleKPIs, setVisibleKPIs] = useState({
+    totalLeads: true,
+    revenue: true,
+    pipeline: true,
+    forecast: true,
+    conversion: true,
+    target: true
+  });
+  const [showKPISettings, setShowKPISettings] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -29,6 +42,7 @@ export default function LeadsOverview() {
 
   useEffect(() => {
     loadData();
+    loadKPISettings();
   }, []);
 
   const loadData = async () => {
@@ -124,6 +138,89 @@ export default function LeadsOverview() {
     }
   };
 
+  // ========== FORECAST CONFIG ==========
+  const openForecastModal = async () => {
+    try {
+      const config = await forecastAPI.getConfig();
+      setForecastConfig(config || []);
+      setForecastForm(config || []);
+      setShowForecastModal(true);
+    } catch (err) {
+      console.error('Erro ao carregar config de forecast:', err);
+      // Usar valores padrão
+      const defaultConfig = [
+        { stage: 'novo', probability: 10 },
+        { stage: 'contactado', probability: 20 },
+        { stage: 'qualificado', probability: 30 },
+        { stage: 'proposta', probability: 60 },
+        { stage: 'negociacao', probability: 80 },
+        { stage: 'ganho', probability: 100 }
+      ];
+      setForecastConfig(defaultConfig);
+      setForecastForm(defaultConfig);
+      setShowForecastModal(true);
+    }
+  };
+
+  const handleSaveForecastConfig = async (e) => {
+    e.preventDefault();
+    try {
+      await forecastAPI.updateConfig(forecastForm);
+      setMessage({ type: 'success', text: 'Configuração de Forecast salva!' });
+      setShowForecastModal(false);
+      loadData();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleResetForecast = async () => {
+    try {
+      await forecastAPI.resetConfig();
+      const config = await forecastAPI.getConfig();
+      setForecastConfig(config || []);
+      setForecastForm(config || []);
+      setMessage({ type: 'success', text: 'Forecast resetado para padrão!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    }
+  };
+
+  const updateForecastProbability = (stage, value) => {
+    setForecastForm(forecastForm.map(f => 
+      f.stage === stage ? { ...f, probability: parseInt(value) } : f
+    ));
+  };
+
+  // ========== KPI VISIBILITY ==========
+  const toggleKPI = (key) => {
+    setVisibleKPIs(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const saveKPISettings = () => {
+    // Salvar no localStorage para persistência
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('visibleKPIs', JSON.stringify(visibleKPIs));
+    }
+    setShowKPISettings(false);
+  };
+
+  const loadKPISettings = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('visibleKPIs');
+      if (saved) {
+        try {
+          setVisibleKPIs(JSON.parse(saved));
+        } catch (e) {
+          console.error('Erro ao carregar configurações de KPI:', e);
+        }
+      }
+    }
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       novo: '#3B82F6',
@@ -164,9 +261,9 @@ export default function LeadsOverview() {
   };
 
   const getLeadTemperature = (score) => {
-    if (score >= 30) return { label: 'Quente', emoji: '🔥', color: '#EF4444' };
-    if (score >= 15) return { label: 'Morno', emoji: '🟡', color: '#F59E0B' };
-    return { label: 'Frio', emoji: '❄️', color: '#3B82F6' };
+    if (score >= 30) return { label: 'Quente', color: '#EF4444' };
+    if (score >= 15) return { label: 'Morno', color: '#F59E0B' };
+    return { label: 'Frio', color: '#3B82F6' };
   };
 
   // ========== PROBABILIDADES POR ESTÁGIO ==========
@@ -333,26 +430,41 @@ export default function LeadsOverview() {
       )}
       
       {/* ========== KPIs PRINCIPAIS - GESTÃO COMERCIAL ========== */}
+      <div className="section-header">
+        <h2>📊 Dashboard</h2>
+        <button className="btn-small" onClick={() => setShowKPISettings(true)}>
+          ⚙️ Personalizar KPIs
+        </button>
+      </div>
+      
       <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-value">{metrics.total}</div>
-          <div className="kpi-label">Total de Leads</div>
-        </div>
+        {visibleKPIs.totalLeads && (
+          <div className="kpi-card">
+            <div className="kpi-value">{metrics.total}</div>
+            <div className="kpi-label">Total de Leads</div>
+          </div>
+        )}
         
-        <div className="kpi-card success">
-          <div className="kpi-value">{formatCurrency(metrics.revenueThisMonth)}</div>
-          <div className="kpi-label">📊 Receita Fechada</div>
-        </div>
+        {visibleKPIs.revenue && (
+          <div className="kpi-card success">
+            <div className="kpi-value">{formatCurrency(metrics.revenueThisMonth)}</div>
+            <div className="kpi-label">📊 Receita Fechada</div>
+          </div>
+        )}
         
-        <div className="kpi-card primary">
-          <div className="kpi-value">{formatCurrency(metrics.pipelineValue)}</div>
-          <div className="kpi-label">Pipeline Total</div>
-        </div>
+        {visibleKPIs.pipeline && (
+          <div className="kpi-card primary">
+            <div className="kpi-value">{formatCurrency(metrics.pipelineValue)}</div>
+            <div className="kpi-label">Pipeline Total</div>
+          </div>
+        )}
         
-        <div className="kpi-card purple">
-          <div className="kpi-value">{formatCurrency(metrics.forecastValue)}</div>
-          <div className="kpi-label">📈 Receita Projetada</div>
-        </div>
+        {visibleKPIs.forecast && (
+          <div className="kpi-card purple">
+            <div className="kpi-value">{formatCurrency(metrics.forecastValue)}</div>
+            <div className="kpi-label">📈 Receita Projetada</div>
+          </div>
+        )}
       </div>
 
       {/* ========== PAINEL DE METAS ========== */}
@@ -440,7 +552,12 @@ export default function LeadsOverview() {
 
       {/* ========== FORECAST - PREVISÃO DE RECEITA PROFISSIONAL ========== */}
       <div className="section">
-        <h3>📊 Previsão de Receita (Forecast)</h3>
+        <div className="section-header">
+          <h3>📊 Previsão de Receita (Forecast)</h3>
+          <button className="btn-small" onClick={openForecastModal}>
+            ⚙️ Configurar Probabilidades
+          </button>
+        </div>
         <div className="forecast-grid">
           <div className="forecast-card closed">
             <div className="forecast-label">Receita Fechada</div>
@@ -628,7 +745,7 @@ export default function LeadsOverview() {
                       }}
                       title={`Score: ${lead.score}`}
                     >
-                      {lead.temperature.emoji} {lead.temperature.label}
+                      {lead.temperature.label}
                     </span>
                   </td>
                   <td>{lead.name}</td>
@@ -715,6 +832,148 @@ export default function LeadsOverview() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL DE CONFIGURAÇÃO DE FORECAST ========== */}
+      {showForecastModal && (
+        <div className="modal-overlay" onClick={() => setShowForecastModal(false)}>
+          <div className="modal large" onClick={e => e.stopPropagation()}>
+            <h3>⚙️ Configurar Probabilidades de Forecast</h3>
+            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '14px' }}>
+              Ajuste as probabilidades de fechamento para cada estágio do funil. 
+              Isso afetará o cálculo da receita projetada.
+            </p>
+            
+            <form onSubmit={handleSaveForecastConfig}>
+              <div className="forecast-config-grid">
+                {forecastForm.map((config) => (
+                  <div key={config.stage} className="forecast-config-item">
+                    <label className="forecast-config-label">
+                      {config.stage.charAt(0).toUpperCase() + config.stage.slice(1)}
+                    </label>
+                    <div className="forecast-config-input-group">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={config.probability}
+                        onChange={(e) => updateForecastProbability(config.stage, e.target.value)}
+                        className="forecast-config-slider"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={config.probability}
+                        onChange={(e) => updateForecastProbability(config.stage, e.target.value)}
+                        className="forecast-config-number"
+                      />
+                      <span className="forecast-config-percent">%</span>
+                    </div>
+                    <div className="forecast-config-bar">
+                      <div 
+                        className="forecast-config-bar-fill"
+                        style={{ 
+                          width: `${config.probability}%`,
+                          backgroundColor: getStatusColor(config.stage)
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="form-actions" style={{ marginTop: '24px' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={handleResetForecast}
+                >
+                  🔄 Resetar para Padrão
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setShowForecastModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary">
+                  💾 Salvar Configuração
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL DE CONFIGURAÇÃO DE KPIs ========== */}
+      {showKPISettings && (
+        <div className="modal-overlay" onClick={() => setShowKPISettings(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>⚙️ Personalizar KPIs</h3>
+            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '14px' }}>
+              Escolha quais indicadores deseja visualizar no seu dashboard.
+            </p>
+            
+            <div className="kpi-settings-list">
+              <label className="kpi-setting-item">
+                <input
+                  type="checkbox"
+                  checked={visibleKPIs.totalLeads}
+                  onChange={() => toggleKPI('totalLeads')}
+                />
+                <span>📊 Total de Leads</span>
+              </label>
+              <label className="kpi-setting-item">
+                <input
+                  type="checkbox"
+                  checked={visibleKPIs.revenue}
+                  onChange={() => toggleKPI('revenue')}
+                />
+                <span>💰 Receita Fechada</span>
+              </label>
+              <label className="kpi-setting-item">
+                <input
+                  type="checkbox"
+                  checked={visibleKPIs.pipeline}
+                  onChange={() => toggleKPI('pipeline')}
+                />
+                <span>🔄 Pipeline Total</span>
+              </label>
+              <label className="kpi-setting-item">
+                <input
+                  type="checkbox"
+                  checked={visibleKPIs.forecast}
+                  onChange={() => toggleKPI('forecast')}
+                />
+                <span>📈 Receita Projetada</span>
+              </label>
+              <label className="kpi-setting-item">
+                <input
+                  type="checkbox"
+                  checked={visibleKPIs.conversion}
+                  onChange={() => toggleKPI('conversion')}
+                />
+                <span>⚡ Taxa de Conversão</span>
+              </label>
+              <label className="kpi-setting-item">
+                <input
+                  type="checkbox"
+                  checked={visibleKPIs.target}
+                  onChange={() => toggleKPI('target')}
+                />
+                <span>🎯 Meta do Mês</span>
+              </label>
+            </div>
+            
+            <div className="form-actions">
+              <button className="btn-secondary" onClick={() => setShowKPISettings(false)}>
+                Cancelar
+              </button>
+              <button className="btn-primary" onClick={saveKPISettings}>
+                💾 Salvar Configurações
+              </button>
+            </div>
           </div>
         </div>
       )}

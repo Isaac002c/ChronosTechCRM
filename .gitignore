@@ -9,3 +9,6 @@ node_modules/
 # builds
 dist/
 build/
+
+# Auxly - AI Task Management (internal data)
+.auxly/

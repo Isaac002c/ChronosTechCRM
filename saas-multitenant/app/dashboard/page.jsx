@@ -9,15 +9,28 @@ import ModuleLayout from '../components/ModuleLayout';
 import LeadsOverview from '../leads/Overview';
 import LeadsAcquisition from '../leads/Acquisition';
 import LeadsPipeline from '../leads/Pipeline';
+import LeadsLeaderboard from '../leads/Leaderboard';
+import LeadsExport from '../leads/Export';
 import LeadsPerformance from '../leads/Performance';
 import LeadsReports from '../leads/Reports';
+
+// Multas Components
+import MultasDashboard from '../multas/Dashboard';
+import MultasClients from '../multas/Clients';
+import MultasContracts from '../multas/Contracts';
+import MultasDocuments from '../multas/Documents';
+import MultasUsers from '../multas/Users';
+import MultasHistory from '../multas/History';
+
+// Settings Components
+import SettingsPage from '../settings/page';
 
 // Componentes placeholder para outros módulos
 const ComingSoon = ({ moduleName }) => (
   <div className="coming-soon">
-    <div className="coming-soon-icon">🚧</div>
+    <div className="coming-soon-icon">[Em Breve]</div>
     <h2>{moduleName} em breve</h2>
-    <p>Este módulo está em desenvolvimento</p>
+    <p>Este modulo esta em desenvolvimento</p>
   </div>
 );
 
@@ -29,49 +42,41 @@ const modulePages = {
       overview: LeadsOverview,
       acquisition: LeadsAcquisition,
       pipeline: LeadsPipeline,
+      leaderboard: LeadsLeaderboard,
+      export: LeadsExport,
       performance: LeadsPerformance,
       reports: LeadsReports,
     }
   },
-  deals: {
-    name: 'Deals',
+  multas: {
+    name: 'Multas',
     pages: {
-      overview: () => <ComingSoon moduleName="Deals" />,
-      pipeline: () => <ComingSoon moduleName="Deals Pipeline" />,
-      performance: () => <ComingSoon moduleName="Deals Performance" />,
-    }
-  },
-  companies: {
-    name: 'Companies',
-    pages: {
-      overview: () => <ComingSoon moduleName="Companies" />,
-      list: () => <ComingSoon moduleName="Lista de Empresas" />,
-    }
-  },
-  tasks: {
-    name: 'Tasks',
-    pages: {
-      overview: () => <ComingSoon moduleName="Tarefas" />,
-      kanban: () => <ComingSoon moduleName="Kanban de Tarefas" />,
-      calendar: () => <ComingSoon moduleName="Calendário" />,
-    }
-  },
-  reports: {
-    name: 'Reports',
-    pages: {
-      overview: () => <ComingSoon moduleName="Relatórios" />,
-      analytics: () => <ComingSoon moduleName="Analytics" />,
-      forecasts: () => <ComingSoon moduleName="Previsões" />,
+      dashboard: MultasDashboard,
+      clients: MultasClients,
+      contracts: MultasContracts,
+      documents: MultasDocuments,
+      users: MultasUsers,
+      history: MultasHistory,
     }
   },
   settings: {
     name: 'Settings',
     pages: {
-      general: () => <ComingSoon moduleName="Configurações" />,
+      general: SettingsPage,
       team: () => <ComingSoon moduleName="Equipe" />,
       integrations: () => <ComingSoon moduleName="Integrações" />,
     }
   },
+};
+
+// Função para obter a aba padrão baseada no módulo
+const getDefaultTab = (module) => {
+  const defaults = {
+    leads: 'overview',
+    multas: 'dashboard',
+    settings: 'general'
+  };
+  return defaults[module] || 'overview';
 };
 
 function DashboardContent() {
@@ -85,7 +90,7 @@ function DashboardContent() {
 
   // Parâmetros da URL
   const currentModule = searchParams.get('module') || 'leads';
-  const urlTab = searchParams.get('tab') || 'overview';
+  const urlTab = searchParams.get('tab') || getDefaultTab(currentModule);
 
   useEffect(() => {
     // Verificar autenticação
@@ -109,15 +114,27 @@ function DashboardContent() {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:3000/auth/logout', {
+      // Chamar logout no backend (porta 5000)
+      await fetch('http://localhost:5000/auth/logout', {
         method: 'POST',
         credentials: 'include'
       });
     } catch (err) {
       console.error('Erro ao fazer logout no backend:', err);
     } finally {
+      // Limpar localStorage - todos os tokens
       localStorage.removeItem('user');
       localStorage.removeItem('tenant');
+      localStorage.removeItem('token');
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('tenantId');
+      localStorage.removeItem('tenant-id');
+      
+      // Limpar cookies
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
+      document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
+      document.cookie = 'tenantId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
+      
       router.push('/login');
     }
   };
@@ -131,14 +148,15 @@ function DashboardContent() {
     return (
       <div className="loading-screen">
         <div className="loading-spinner"></div>
-        <p>Carregando Chronos Tech...</p>
+        <p>Carregando ChronosTek...</p>
       </div>
     );
   }
 
   // Obter módulo atual
   const moduleData = modulePages[currentModule] || modulePages.leads;
-  const ActivePage = moduleData.pages[activeTab] || moduleData.pages.overview;
+  const defaultTab = getDefaultTab(currentModule);
+  const ActivePage = moduleData.pages[activeTab] || moduleData.pages[defaultTab] || moduleData.pages.overview;
 
   return (
     <div className="app-container">

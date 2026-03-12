@@ -4,8 +4,8 @@ import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Chronos Tech - CRM',
-  description: 'CRM Multitenant para gestão de leads e vendas',
+  title: 'ChronosTek - CRM',
+  description: 'CRM Multitenant para gestao de leads e vendas',
 };
 
 export default function RootLayout({ children }) {
