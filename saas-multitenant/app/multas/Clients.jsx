@@ -209,14 +209,14 @@ export default function MultasClients() {
                       className="btn-icon"
                       title="Editar"
                     >
-                      [Editar]
+                      ✏️
                     </button>
                     <button 
                       onClick={(e) => handleDelete(e, client.id)}
                       className="btn-icon danger"
                       title="Excluir"
                     >
-                      [Excluir]
+                      🗑️
                     </button>
                   </td>
                 </tr>
