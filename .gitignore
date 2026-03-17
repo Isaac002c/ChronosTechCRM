@@ -1,11 +1,4 @@
-# dependências
-node_modules/
-**/node_modules/
-
-# variáveis de ambiente
+node_modules
 .env
-**/.env
-
-# builds
-dist/
-build/
+.env.local
+.env.*
