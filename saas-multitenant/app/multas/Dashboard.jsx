@@ -2,20 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  getContractDashboard, 
-  getContractsByOrgan, 
-  getContractAlerts,
-  getContractsNearDue,
-  getOverdueContracts
-} from '../lib/contractsAPI';
+  getFineDashboard, 
+  getFinesByOrgan, 
+  getFineAlerts,
+  getUrgentFines,
+  getOverdueFines
+} from '../lib/finesAPI';
 import { getClients } from '../lib/clientsAPI';
+import { getFines } from '../lib/finesAPI';
 
 export default function MultasDashboard() {
   const [stats, setStats] = useState(null);
   const [contractsByOrgan, setContractsByOrgan] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [nearDueContracts, setNearDueContracts] = useState([]);
-  const [overdueContracts, setOverdueContracts] = useState([]);
+  const [overdueContracts, setOverdueContracts] = useState([]); 
+  const [aprData, setAprData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
@@ -32,15 +34,15 @@ export default function MultasDashboard() {
         dashboardData, 
         organData, 
         alertsData,
-        nearDueData,
+        urgentData,
         overdueData,
         clientsData
       ] = await Promise.all([
-        getContractDashboard(),
-        getContractsByOrgan(),
-        getContractAlerts(),
-        getContractsNearDue(7),
-        getOverdueContracts(),
+        getFineDashboard(),
+        getFinesByOrgan(),
+        getFineAlerts(),
+        getUrgentFines(7),
+        getOverdueFines(),
         getClients()
       ]);
       
@@ -50,8 +52,9 @@ export default function MultasDashboard() {
       });
       setContractsByOrgan(organData || []);
       setAlerts(alertsData || []);
-      setNearDueContracts(nearDueData || []);
+      setNearDueContracts(urgentData || []);
       setOverdueContracts(overdueData || []);
+      setAprData([]); // No APR for fines
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
       setError(err.message);
@@ -100,6 +103,11 @@ export default function MultasDashboard() {
     setShowAlertsModal(true);
   };
 
+  const getMaxSellerCount = () => {
+    if (!aprData.length) return 1;
+    return Math.max(...aprData.map(s => parseInt(s.granted_count) || 0));
+  };
+
   const getMaxOrganCount = () => {
     if (!contractsByOrgan.length) return 1;
     return Math.max(...contractsByOrgan.map(o => parseInt(o.count) || 0));
@@ -139,7 +147,6 @@ export default function MultasDashboard() {
                 onClick={() => openAlertsModal(alert.type)}
                 style={{ borderLeftColor: getAlertColor(alert.type) }}
               >
-
                 <div className="alert-content">
                   <h4>{alert.title}</h4>
                   <p>{alert.message}</p>
@@ -151,60 +158,67 @@ export default function MultasDashboard() {
         </div>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Cards removidos: Valor Total e Valor Ativo */}
       <div className="dashboard-grid">
-        {/* Card - Total de Contratos */}
         <div className="stat-card">
           <div className="stat-content">
             <h3>Total de Contratos</h3>
             <p className="stat-value">{stats?.total_contracts || 0}</p>
           </div>
         </div>
-
-        {/* Card - Contratos Ativos */}
         <div className="stat-card active">
           <div className="stat-content">
             <h3>Contratos Ativos</h3>
             <p className="stat-value">{stats?.active_contracts || 0}</p>
           </div>
         </div>
-
-        {/* Card - Contratos Concluídos */}
         <div className="stat-card completed">
           <div className="stat-content">
             <h3>Concluídos</h3>
             <p className="stat-value">{stats?.completed_contracts || 0}</p>
           </div>
         </div>
-
-        {/* Card - Total de Clientes */}
         <div className="stat-card clients">
           <div className="stat-content">
             <h3>Total de Clientes</h3>
             <p className="stat-value">{stats?.totalClients || 0}</p>
           </div>
         </div>
-
-        {/* Card - Valor Total */}
-        <div className="stat-card value">
-          <div className="stat-content">
-            <h3>Valor Total</h3>
-            <p className="stat-value">{formatCurrency(stats?.total_value)}</p>
-          </div>
-        </div>
-
-        {/* Card - Valor Ativo */}
-        <div className="stat-card active-value">
-          <div className="stat-content">
-            <h3>Valor Ativo</h3>
-            <p className="stat-value">{formatCurrency(stats?.active_value)}</p>
-          </div>
-        </div>
       </div>
 
-      {/* Contratos por Órgão */}
+      {/* Gráfico Registros APR */}
       <div className="charts-section">
-        <h3 className="section-title">Grafico - Contratos por Orgao</h3>
+        <h3 className="section-title">Gráfico - Registros APR</h3>
+        {aprData.length > 0 ? (
+          <div className="organ-chart">
+            {aprData.map((seller, index) => (
+              <div key={index} className="organ-bar-container">
+                <div className="organ-label">
+                  <span className="organ-name">{seller.seller_name || 'N/A'}</span>
+                  <span className="organ-count">{seller.granted_count || 0} APR</span>
+                </div>
+                <div className="organ-bar-bg">
+                  <div 
+                    className="organ-bar-fill"
+                    style={{ 
+                      width: `${((seller.granted_count || 0) / getMaxSellerCount()) * 100}%`,
+                      backgroundColor: `hsl(${index * 40}, 70%, 50%)`
+                    }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-chart">
+            <p>Nenhum registro APR encontrado</p>
+          </div>
+        )}
+      </div>
+
+      {/* Gráfico Contratos por Órgão (existente) */}
+      <div className="charts-section">
+        <h3 className="section-title">Gráfico - Contratos por Órgão</h3>
         {contractsByOrgan.length > 0 ? (
           <div className="organ-chart">
             {contractsByOrgan.map((organ, index) => (
@@ -236,7 +250,7 @@ export default function MultasDashboard() {
       {/* Resumo */}
       <div className="dashboard-info">
         <div className="info-card">
-          <h4>Resumo - Modulo de Multas</h4>
+          <h4>Resumo - Módulo de Multas</h4>
           <ul>
             <li>Gerencie contratos de multas de trânsito</li>
             <li>Cadastre clientes e proprietários de veículos</li>
@@ -253,9 +267,9 @@ export default function MultasDashboard() {
           <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                {alertType === 'warning' && 'Aviso: Contratos Proximos ao Vencimento'}
+                {alertType === 'warning' && 'Aviso: Contratos Próximos ao Vencimento'}
                 {alertType === 'danger' && 'Erro: Contratos Vencidos'}
-                {alertType === 'info' && 'Info: Contratos Sem Atualizacao'}
+                {alertType === 'info' && 'Info: Contratos Sem Atualização'}
               </h2>
               <button onClick={() => setShowAlertsModal(false)} className="btn-close">[X]</button>
             </div>

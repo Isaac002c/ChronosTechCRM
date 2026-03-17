@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  getDocuments, 
-  createDocument, 
-  deleteDocument,
-  getDocumentStats 
-} from '../lib/documentsAPI';
-import { getContracts } from '../lib/contractsAPI';
+  getFineDocuments, 
+  addFineDocument, 
+  deleteFineDocument
+} from '../lib/finesAPI';
 import { getClients } from '../lib/clientsAPI';
+import { getFines } from '../lib/finesAPI';
 
 export default function MultasDocuments() {
   const [documents, setDocuments] = useState([]);
@@ -55,16 +54,13 @@ export default function MultasDocuments() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [documentsData, contractsData, clientsData, statsData] = await Promise.all([
-        getDocuments(filters),
-        getContracts(),
-        getClients(),
-        getDocumentStats()
+      const [finesData, clientsData] = await Promise.all([
+        getFines(),
+        getClients()
       ]);
-      setDocuments(documentsData);
-      setContracts(contractsData);
+      setDocuments(finesData);
       setClients(clientsData);
-      setStats(statsData);
+      // No stats for now
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
       setError(err.message);

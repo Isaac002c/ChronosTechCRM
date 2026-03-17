@@ -155,31 +155,56 @@ const createActivityLog = async ({
 };
 
 // READ - Listar logs de atividades (com paginação)
-const getActivityLogs = async (tenant_id, { page = 1, limit = 50 } = {}) => {
+const getActivityLogs = async (tenant_id, filters = {}) => {
+  const { page = 1, limit = 50, entity_type, action, days } = filters;
   const offset = (page - 1) * limit;
   
-  const result = await pool.query(
-    `SELECT al.*, u.name as user_name, u.email as user_email
-     FROM activity_logs al
-     LEFT JOIN users u ON al.user_id = u.id
-     WHERE al.tenant_id = $1
-     ORDER BY al.created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [tenant_id, limit, offset]
-  );
+  let query = `
+    SELECT al.*, u.name as user_name, u.email as user_email
+    FROM activity_logs al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.tenant_id = $1
+  `;
+  let countQuery = 'SELECT COUNT(*) as total FROM activity_logs WHERE tenant_id = $1';
+  let params = [tenant_id];
+  let paramIndex = 2;
+  
+  if (entity_type) {
+    query += ` AND al.entity_type = $${paramIndex}`;
+    countQuery += ` AND entity_type = $${paramIndex}`;
+    params.push(entity_type);
+    paramIndex++;
+  }
+  
+  if (action) {
+    query += ` AND al.action = $${paramIndex}`;
+    countQuery += ` AND action = $${paramIndex}`;
+    params.push(action);
+    paramIndex++;
+  }
+  
+  if (days) {
+    query += ` AND al.created_at >= NOW() - INTERVAL '${days} days'`;
+    countQuery += ` AND created_at >= NOW() - INTERVAL '${days} days'`;
+  }
+  
+  query += `
+    ORDER BY al.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+  params.push(limit, offset);
+  
+  const result = await pool.query(query, params);
   
   // Contar total
-  const countResult = await pool.query(
-    'SELECT COUNT(*) as total FROM activity_logs WHERE tenant_id = $1',
-    [tenant_id]
-  );
+  const countResult = await pool.query(countQuery, params.slice(0, -2));
   
   return {
     logs: result.rows,
     total: parseInt(countResult.rows[0].total),
     page,
     limit,
-    totalPages: Math.ceil(countResult.rows[0].total / limit)
+    totalPages: Math.ceil(parseInt(countResult.rows[0].total) / limit)
   };
 };
 

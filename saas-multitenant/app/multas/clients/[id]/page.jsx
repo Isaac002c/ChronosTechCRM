@@ -7,16 +7,16 @@ import { getServicesByClient, createService, deleteService } from '../../../lib/
 import { getContractsByService, createContract, updateContract, deleteContract } from '../../../lib/contractsAPI';
 
 // Constantes para dropdowns
-const SERVICE_TYPES = ['Crci', 'multa', 'suspensão', 'cassação', 'revisão de atos', 'processo'];
+const SERVICE_TYPES = ['CRCI', 'MULTA', 'SUSPENSÃO', 'CASSAÇÃO', 'REVISÃO DE ATOS', 'PROCESSO'];
 const MULTA_STATUSES = [
-  'Aprs. Defesa Prévia',
-  'Defesa prévia - analise',
-  'Aprs 1 Instancia',
-  '1 instancia - analise',
-  'aprs 2 instancia',
-  '2 instancia -analise'
+  'APRS DEFESA PRÉVIA',
+  'DEFESA PRÉVIA - ANÁLISE',
+  'APRS 1 INSTÂNCIA',
+  '1 INSTÂNCIA - ANÁLISE',
+  'APRS 2 INSTÂNCIA',
+  '2 INSTÂNCIA -ANÁLISE'
 ];
-const PROCESSO_TIPOS = ['Dentran', 'Der', 'Dnit', 'Smtr', 'Renainf', 'PMRJ', 'Prefeitura UF'];
+const PROCESSO_TIPOS = ['DETTRAN', 'DER', 'DNIT', 'SMTR', 'RENAINF', 'PMRJ', 'PREFEITURA UF'];
 
 export default function ClientDetail() {
   const router = useRouter();

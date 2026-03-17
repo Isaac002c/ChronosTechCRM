@@ -68,9 +68,16 @@ export const checkPlanLimits = async (resource, count) => {
 // ACTIVITY LOGS API
 // ============================================
 
-// Listar logs de atividades
-export const getActivityLogs = async (page = 1, limit = 50) => {
-  const data = await fetchAPI(`/activity?page=${page}&limit=${limit}`);
+// Listar logs de atividades com filtros
+export const getActivityLogs = async (filters = {}) => {
+  const params = new URLSearchParams({
+    page: filters.page || 1,
+    limit: filters.limit || 50,
+    ...(filters.entity_type && { entity_type: filters.entity_type }),
+    ...(filters.action && { action: filters.action }),
+    ...(filters.days && { days: filters.days }),
+  });
+  const data = await fetchAPI(`/activity?${params}`);
   return data.data;
 };
 

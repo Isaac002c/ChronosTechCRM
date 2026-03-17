@@ -32,6 +32,7 @@ const saasRoutes = require('./routes/saasRoutes');
 
 // Rotas de gerenciamento de usuários
 const userManagementRoutes = require('./routes/userManagementRoutes');
+const finesRoutes = require('./routes/finesRoutes');
 
 const app = express();
 
@@ -97,6 +98,15 @@ app.use('/api/services', serviceRoutes);
 
 // Rotas SaaS
 app.use('/api', saasRoutes);
+
+// Rotas de multas
+app.use('/api/fines', finesRoutes);
+
+// Rotas de clients, contracts, services (APRs)
+app.use('/api/clients', clientRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Rotas de gerenciamento de usuários
 app.use('/api/users/management', userManagementRoutes);

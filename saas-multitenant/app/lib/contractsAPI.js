@@ -29,12 +29,19 @@ const fetchAPI = async (endpoint, options = {}) => {
   return data;
 };
 
-// Functions used in client detail
+// Get all contracts
+export const getAllContracts = async () => {
+  const data = await fetchAPI('/contracts');
+  return data.data;
+};
+
+// Get contracts by service
 export const getContractsByService = async (serviceId) => {
   const data = await fetchAPI(`/contracts/service/${serviceId}`);
   return data.data;
 };
 
+// Create contract
 export const createContract = async (contractData) => {
   const data = await fetchAPI('/contracts', {
     method: 'POST',
@@ -43,6 +50,7 @@ export const createContract = async (contractData) => {
   return data.data;
 };
 
+// Update contract
 export const updateContract = async (id, contractData) => {
   const data = await fetchAPI(`/contracts/${id}`, {
     method: 'PUT',
@@ -51,6 +59,7 @@ export const updateContract = async (id, contractData) => {
   return data.data;
 };
 
+// Delete contract
 export const deleteContract = async (id) => {
   const data = await fetchAPI(`/contracts/${id}`, {
     method: 'DELETE',
@@ -58,11 +67,7 @@ export const deleteContract = async (id) => {
   return data.data;
 };
 
-// Backward compatibility for other pages (Dashboard, Documents)
-export const getContracts = async () => {
-  return [];
-};
-
+// Dashboard functions (stubs for compatibility)
 export const getContractDashboard = async () => {
   return {};
 };
@@ -81,9 +86,5 @@ export const getContractsNearDue = async () => {
 
 export const getOverdueContracts = async () => {
   return [];
-};
-
-export const getContractStats = async () => {
-  return { total: 0 };
 };
 

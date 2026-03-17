@@ -28,8 +28,15 @@ export default function MultasHistory() {
   const loadData = async () => {
     try {
       setLoading(true);
+      const logFilters = {
+        page,
+        limit: 20,
+        entity_type: filters.entity_type,
+        action: filters.action,
+        days: parseInt(filters.date_range)
+      };
       const [logsData, statsData] = await Promise.all([
-        getActivityLogs(page, 20),
+        getActivityLogs(logFilters),
         getActivityStats(parseInt(filters.date_range))
       ]);
       setLogs(logsData.logs || []);
@@ -167,8 +174,9 @@ export default function MultasHistory() {
             onChange={(e) => setFilters({ ...filters, entity_type: e.target.value })}
           >
             <option value="">Todas</option>
-            <option value="contract">Contratos</option>
+            <option value="fine">Multas</option>
             <option value="client">Clientes</option>
+            <option value="contract">Contratos</option>
             <option value="document">Documentos</option>
             <option value="user">Usuários</option>
           </select>
@@ -184,6 +192,8 @@ export default function MultasHistory() {
             <option value="update">Atualização</option>
             <option value="delete">Exclusão</option>
             <option value="login">Login</option>
+            <option value="logout">Logout</option>
+            <option value="status_changed">Status alterado</option>
           </select>
         </div>
         <div className="filter-group">
@@ -195,8 +205,15 @@ export default function MultasHistory() {
             <option value="7">Últimos 7 dias</option>
             <option value="30">Últimos 30 dias</option>
             <option value="90">Últimos 90 dias</option>
+            <option value="365">Último ano</option>
           </select>
         </div>
+        <button 
+          className="btn-reset" 
+          onClick={() => setFilters({ entity_type: '', action: '', date_range: '30' })}
+        >
+          Limpar filtros
+        </button>
       </div>
 
       {/* Lista de Atividades */}

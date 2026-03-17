@@ -71,16 +71,19 @@ router.get('/subscription/limits/:resource', async (req, res) => {
   }
 });
 
-// GET /api/activity - Listar logs de atividades
+// GET /api/activity - Listar logs de atividades com filtros
 router.get('/activity', async (req, res) => {
   try {
     const tenantId = req.tenantId;
-    const { page = 1, limit = 50 } = req.query;
+    const filters = {
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 50,
+      entity_type: req.query.entity_type,
+      action: req.query.action,
+      days: parseInt(req.query.days)
+    };
     
-    const result = await saasModel.getActivityLogs(tenantId, {
-      page: parseInt(page),
-      limit: parseInt(limit)
-    });
+    const result = await saasModel.getActivityLogs(tenantId, filters);
     
     res.json({ success: true, data: result });
   } catch (err) {
