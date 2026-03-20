@@ -1,5 +1,5 @@
 //api de comunicação com o backend
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL + '/api';
 
 const getHeaders = () => {
   if (typeof window !== 'undefined') {
@@ -70,7 +70,7 @@ const handleResponse = async (response) => {
 // Buscar metas do ano atual
 export const getTargets = async () => {
   try {
-    const response = await fetch(`${API_URL}/api/targets`, {
+    const response = await fetch(`${API_URL}/targets`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -85,7 +85,7 @@ export const getTargets = async () => {
 // Buscar metas de um ano específico
 export const getTargetsByYear = async (year) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/${year}`, {
+    const response = await fetch(`${API_URL}/targets/${year}`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -100,7 +100,7 @@ export const getTargetsByYear = async (year) => {
 // Criar ou atualizar meta
 export const createTarget = async ({ month, year, target_value }) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets`, {
+    const response = await fetch(`${API_URL}/targets`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -119,7 +119,7 @@ export const createTarget = async ({ month, year, target_value }) => {
 // Listar todas as atividades
 export const getAllActivities = async () => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities`, {
+    const response = await fetch(`${API_URL}/targets/activities`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -134,7 +134,7 @@ export const getAllActivities = async () => {
 // Listar atividades atrasadas
 export const getOverdueActivities = async () => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/overdue`, {
+    const response = await fetch(`${API_URL}/targets/activities/overdue`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -149,14 +149,14 @@ export const getOverdueActivities = async () => {
 // Listar próximas atividades
 export const getUpcomingActivities = async () => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/upcoming`, {
+    const response = await fetch(`${API_URL}/targets/activities/upcoming`, {
       headers: getHeaders(),
       credentials: 'include'
     });
     const data = await handleResponse(response);
     return data.data || [];
   } catch (err) {
-    console.error('[targetsAPI] getUpcomingActivities error:', err);
+    console.error('[targetsAPI] getTargetsByYear error:', err);
     throw err;
   }
 };
@@ -164,7 +164,7 @@ export const getUpcomingActivities = async () => {
 // Listar leads inativos (sem atividade há X dias)
 export const getInactiveLeads = async (days = 7) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/inactive/${days}`, {
+    const response = await fetch(`${API_URL}/targets/activities/inactive/${days}`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -179,7 +179,7 @@ export const getInactiveLeads = async (days = 7) => {
 // Estatísticas de atividades
 export const getActivityStats = async () => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/stats`, {
+    const response = await fetch(`${API_URL}/targets/activities/stats`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -194,7 +194,7 @@ export const getActivityStats = async () => {
 // Listar atividades de um lead específico
 export const getLeadActivities = async (leadId) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/lead/${leadId}`, {
+    const response = await fetch(`${API_URL}/targets/activities/lead/${leadId}`, {
       headers: getHeaders(),
       credentials: 'include'
     });
@@ -209,7 +209,7 @@ export const getLeadActivities = async (leadId) => {
 // Criar atividade
 export const createActivity = async ({ lead_id, type, description, due_date }) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities`, {
+    const response = await fetch(`${API_URL}/targets/activities`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
@@ -226,7 +226,7 @@ export const createActivity = async ({ lead_id, type, description, due_date }) =
 // Marcar atividade como completa
 export const completeActivity = async (id) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/${id}/complete`, {
+    const response = await fetch(`${API_URL}/targets/activities/${id}/complete`, {
       method: 'PUT',
       headers: getHeaders(),
       credentials: 'include'
@@ -242,7 +242,7 @@ export const completeActivity = async (id) => {
 // Atualizar atividade
 export const updateActivity = async (id, { type, description, due_date, completed }) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/${id}`, {
+    const response = await fetch(`${API_URL}/targets/activities/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       credentials: 'include',
@@ -259,7 +259,7 @@ export const updateActivity = async (id, { type, description, due_date, complete
 // Deletar atividade
 export const deleteActivity = async (id) => {
   try {
-    const response = await fetch(`${API_URL}/api/targets/activities/${id}`, {
+    const response = await fetch(`${API_URL}/targets/activities/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
       credentials: 'include'
@@ -289,4 +289,3 @@ export default {
   updateActivity,
   deleteActivity
 };
-

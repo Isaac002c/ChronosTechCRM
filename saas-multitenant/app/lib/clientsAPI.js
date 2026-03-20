@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL + '/api';
 
 // Helper para obter o token
 const getToken = () => {
