@@ -145,12 +145,18 @@ const PORT = process.env.PORT || 5000;
 
 (async () => {
   try {
-    await pool.query('SELECT NOW()'); // testa conexão com DB
-    console.log('Conectado ao Banco de Dados');
-    console.log(`CRM rodando na porta ${PORT}`);
+    console.log('[app.js] Testando conexão com o banco de dados (SELECT NOW())...');
+    const result = await pool.query('SELECT NOW()');
+    console.log('[app.js] ✅ Conectado ao Banco de Dados. Hora do servidor DB:', result.rows[0].now);
+    console.log(`[app.js] 🚀 CRM rodando na porta ${PORT}`);
     app.listen(PORT);
   } catch (err) {
-    console.error('Erro ao conectar no banco:', err.message);
+    console.error('[app.js] ❌ Erro ao conectar no banco — servidor NÃO iniciado.');
+    console.error('  message :', err.message);
+    console.error('  code    :', err.code    ?? '(none)');
+    console.error('  errno   :', err.errno   ?? '(none)');
+    console.error('  syscall :', err.syscall ?? '(none)');
+    console.error('  stack   :', err.stack);
     process.exit(1);
   }
 })();
