@@ -1,6 +1,6 @@
 // lib/usersAPI.js - API para gerenciamento de usuários
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL + '/api';
 
 // Helper para obter o token do cookie
 const getToken = () => {
