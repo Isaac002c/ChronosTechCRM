@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
 
-// 🔍 DEBUG - ver se a variável está chegando
+// 🔍 Ver se a variável existe
 console.log("DATABASE_URL:", process.env.DATABASE_URL);
 
 const pool = new Pool({
@@ -10,15 +10,17 @@ const pool = new Pool({
   }
 });
 
-// 🔥 TESTE DE CONEXÃO REAL
-pool.connect()
-  .then(client => {
+// 🔥 TESTE REAL COM ERRO COMPLETO
+(async () => {
+  try {
+    const client = await pool.connect();
     console.log("✅ Conectado ao banco com sucesso!");
     client.release();
-  })
-  .catch(err => {
-    console.error("❌ ERRO COMPLETO AO CONECTAR NO BANCO:");
-    console.error(err);
-  });
+  } catch (err) {
+    console.error("❌ ERRO COMPLETO AO CONECTAR:");
+    console.error(err.message);
+    console.error(err.stack);
+  }
+})();
 
 module.exports = pool;
