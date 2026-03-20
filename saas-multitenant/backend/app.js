@@ -1,6 +1,6 @@
 // ============================================
 // ChronosTech CRM - Express Backend
-// app.js - Final Version
+// app.js - Final Version (Render Ready)
 // ============================================
 
 require('dns').setDefaultResultOrder('ipv4first'); // força IPv4 primeiro
@@ -66,7 +66,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // --- 3. Cookie parser ---
 app.use(cookieParser());
 
-// --- 4. Logging de requisições (opcional) ---
+// --- 4. Logging de requisições ---
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
@@ -83,6 +83,7 @@ app.use('/auth', authRoutes);
 // ============================================
 
 app.use('/api', tenantContext);
+
 app.use('/api/leads', leadsRoutes);
 app.use('/api/targets', targetsRoutes);
 app.use('/api/sellers', sellersRoutes);
@@ -90,25 +91,19 @@ app.use('/api/forecast', forecastRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
-// Rotas do módulo de multas
+// Módulo de multas
 app.use('/api/clients', clientRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/services', serviceRoutes);
 
-// Rotas SaaS
+// SaaS
 app.use('/api', saasRoutes);
 
-// Rotas de multas
+// Multas
 app.use('/api/fines', finesRoutes);
 
-// Rotas de clients, contracts, services (APRs)
-app.use('/api/clients', clientRoutes);
-app.use('/api/contracts', contractRoutes);
-app.use('/api/services', serviceRoutes);
-app.use('/api/documents', documentRoutes);
-
-// Rotas de gerenciamento de usuários
+// Gestão de usuários
 app.use('/api/users/management', userManagementRoutes);
 
 // ============================================
@@ -138,19 +133,21 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================
-// START SERVER
+// START SERVER (CORRIGIDO PRA RENDER)
 // ============================================
 
 const PORT = process.env.PORT || 5000;
 
 (async () => {
   try {
-    await pool.query('SELECT NOW()'); // testa conexão com DB
-    console.log('Conectado ao Banco de Dados');
-    console.log(`CRM rodando na porta ${PORT}`);
-    app.listen(PORT);
+    await pool.query('SELECT NOW()');
+    console.log('✅ Conectado ao Banco de Dados');
   } catch (err) {
-    console.error('Erro ao conectar no banco:', err.message);
-    process.exit(1);
+    console.error('❌ Erro ao conectar no banco:', err.message);
+    // NÃO derruba o servidor (IMPORTANTE pro Render)
   }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 CRM rodando na porta ${PORT}`);
+  });
 })();
