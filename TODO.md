@@ -1,21 +1,19 @@
-# ✅ TASK COMPLETED: History tab now fully functional with filters!
+# TODO: Fix API Route Mismatches (Approved Plan)
 
-## Summary
-- **Filters implemented**: Entity type (fine, client, etc.), Action (create/update/etc.), Date range (7/30/90/365 days)
-- **Backend**: Dynamic SQL filtering + pagination + tenant isolation
-- **Frontend**: Full filter integration, reset button, improved options
-- **API**: Full query param support
+## Current Progress
+- [x] Analysis complete - identified frontend inconsistencies
+- [x] Plan approved by user
+- [ ] 1. Create TODO.md ✅ DONE
 
-## Changes Made:
-1. ✅ saasAPI.js: getActivityLogs(filters)
-2. ✅ saasModels.js: Dynamic WHERE clauses for filters
-3. ✅ saasRoutes.js: Parse all query params
-4. ✅ History.jsx: Apply filters to API, UX improvements
+## Steps to Complete
+1. **Fix sellersAPI.js** - Remove double /api → `${API_BASE_URL}/api/sellers`
+2. **Fix targetsAPI.js** - Standardize to API_BASE_URL pattern
+3. **Standardize clientsAPI.js** - Ensure consistent BASE_URL + /api/clients
+4. **Standardize contractsAPI.js** - Ensure consistent BASE_URL + /api/contracts
+5. **Standardize servicesAPI.js** - Ensure consistent BASE_URL + /api/services
+6. **Fix remaining lib/*.js** - usersAPI, finesAPI, documentsAPI, saasAPI (check each)
+7. **Test backend server** - cd saas-multitenant/backend && node app.js
+8. **Test frontend calls** - Check browser Network tab for /api/api/ → gone
+9. **attempt_completion** - All APIs consistent
 
-## Test Instructions:
-1. Restart backend: `cd saas-multitenant/backend && pkill -f "node.*app.js" && npm start`
-2. Frontend: `cd saas-multitenant && npm run dev`
-3. Login → Multas → Histórico
-4. Test filters, pagination, clear button
-
-**Progress: 5/5 ✅**
+Next step: Edit sellersAPI.js

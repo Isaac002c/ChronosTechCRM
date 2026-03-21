@@ -1,42 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL + '/api';
-
-// Helper para obter o token
-const getToken = () => {
-  if (typeof document !== 'undefined') {
-    // Primeiro tenta localStorage (onde o login salva)
-    const localToken = localStorage.getItem('auth-token') || localStorage.getItem('token');
-    if (localToken) return localToken;
-    
-    // Depois tenta cookie (suporta ambos os nomes)
-    const cookies = document.cookie.split('; ');
-    const tokenCookie = cookies.find(row => row.startsWith('auth-token=') || row.startsWith('token='));
-    return tokenCookie ? tokenCookie.split('=')[1] : null;
-  }
-  return null;
-};
-
-// Helper para requisições
-const fetchAPI = async (endpoint, options = {}) => {
-  const token = getToken();
-  
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...options.headers,
-    },
-    credentials: 'include',
-  });
-  
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Erro na requisição');
-  }
-  
-  return data;
-};
+import { apiRequest } from './api.js';
 
 // ============================================
 // FINES API - Multas V2
@@ -45,132 +7,94 @@ const fetchAPI = async (endpoint, options = {}) => {
 // Listar todas as multas
 export const getFines = async (filters = {}) => {
   const params = new URLSearchParams(filters).toString();
-  const endpoint = params ? `/fines?${params}` : '/fines';
-  const data = await fetchAPI(endpoint);
-  return data.data;
+  return (await apiRequest(`/api/fines${params ? `?${params}` : ''}`)).data;
 };
 
 // Buscar multa por ID
-export const getFineById = async (id) => {
-  const data = await fetchAPI(`/fines/${id}`);
-  return data.data;
-};
+export const getFineById = async (id) =>
+  (await apiRequest(`/api/fines/${id}`)).data;
 
 // Buscar multas por cliente
-export const getFinesByClient = async (clientId) => {
-  const data = await fetchAPI(`/fines/client/${clientId}`);
-  return data.data;
-};
+export const getFinesByClient = async (clientId) =>
+  (await apiRequest(`/api/fines/client/${clientId}`)).data;
 
 // Buscar multas por vendedor
-export const getFinesBySeller = async (sellerId) => {
-  const data = await fetchAPI(`/fines/seller/${sellerId}`);
-  return data.data;
-};
+export const getFinesBySeller = async (sellerId) =>
+  (await apiRequest(`/api/fines/seller/${sellerId}`)).data;
 
 // Estatísticas de multas
-export const getFineStats = async () => {
-  const data = await fetchAPI('/fines/stats');
-  return data.data;
-};
+export const getFineStats = async () =>
+  (await apiRequest('/api/fines/stats')).data;
 
 // Dashboard de multas
-export const getFineDashboard = async () => {
-  const data = await fetchAPI('/fines/dashboard');
-  return data.data;
-};
+export const getFineDashboard = async () =>
+  (await apiRequest('/api/fines/dashboard')).data;
 
 // Alertas de multas
-export const getFineAlerts = async () => {
-  const data = await fetchAPI('/fines/alerts');
-  return data.data;
-};
+export const getFineAlerts = async () =>
+  (await apiRequest('/api/fines/alerts')).data;
 
 // Multas urgentes
-export const getUrgentFines = async (days = 5) => {
-  const data = await fetchAPI(`/fines/urgent?days=${days}`);
-  return data.data;
-};
+export const getUrgentFines = async (days = 5) =>
+  (await apiRequest(`/api/fines/urgent?days=${days}`)).data;
 
 // Multas aguardando documento
-export const getFinesWaitingDocument = async () => {
-  const data = await fetchAPI('/fines/waiting-document');
-  return data.data;
-};
+export const getFinesWaitingDocument = async () =>
+  (await apiRequest('/api/fines/waiting-document')).data;
 
 // Multas aguardando protocolo
-export const getFinesWaitingProtocol = async () => {
-  const data = await fetchAPI('/fines/waiting-protocol');
-  return data.data;
-};
+export const getFinesWaitingProtocol = async () =>
+  (await apiRequest('/api/fines/waiting-protocol')).data;
 
 // Multas vencidas
-export const getOverdueFines = async () => {
-  const data = await fetchAPI('/fines/overdue');
-  return data.data;
-};
+export const getOverdueFines = async () =>
+  (await apiRequest('/api/fines/overdue')).data;
 
 // Multas por órgão
-export const getFinesByOrgan = async () => {
-  const data = await fetchAPI('/fines/by-organ');
-  return data.data;
-};
+export const getFinesByOrgan = async () =>
+  (await apiRequest('/api/fines/by-organ')).data;
 
 // Multas por vendedor
-export const getFinesBySellerGrouped = async () => {
-  const data = await fetchAPI('/fines/by-seller');
-  return data.data;
-};
+export const getFinesBySellerGrouped = async () =>
+  (await apiRequest('/api/fines/by-seller')).data;
 
 // Taxa de deferimento
-export const getDefermentRate = async () => {
-  const data = await fetchAPI('/fines/deferment-rate');
-  return data.data;
-};
+export const getDefermentRate = async () =>
+  (await apiRequest('/api/fines/deferment-rate')).data;
 
 // Criar multa
-export const createFine = async (fineData) => {
-  const data = await fetchAPI('/fines', {
+export const createFine = async (fineData) =>
+  (await apiRequest('/api/fines', {
     method: 'POST',
-    body: JSON.stringify(fineData),
-  });
-  return data.data;
-};
+    body: fineData,
+  })).data;
 
 // Atualizar multa
-export const updateFine = async (id, fineData) => {
-  const data = await fetchAPI(`/fines/${id}`, {
+export const updateFine = async (id, fineData) =>
+  (await apiRequest(`/api/fines/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(fineData),
-  });
-  return data.data;
-};
+    body: fineData,
+  })).data;
 
 // Atualizar status da multa
-export const updateFineStatus = async (id, status) => {
-  const data = await fetchAPI(`/fines/${id}/status`, {
+export const updateFineStatus = async (id, status) =>
+  (await apiRequest(`/api/fines/${id}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
-  });
-  return data.data;
-};
+    body: { status },
+  })).data;
 
 // Atualizar estágio da multa
-export const updateFineStage = async (id, stage) => {
-  const data = await fetchAPI(`/fines/${id}/stage`, {
+export const updateFineStage = async (id, stage) =>
+  (await apiRequest(`/api/fines/${id}/stage`, {
     method: 'PATCH',
-    body: JSON.stringify({ stage }),
-  });
-  return data.data;
-};
+    body: { stage },
+  })).data;
 
 // Deletar multa
-export const deleteFine = async (id) => {
-  const data = await fetchAPI(`/fines/${id}`, {
+export const deleteFine = async (id) =>
+  (await apiRequest(`/api/fines/${id}`, {
     method: 'DELETE',
-  });
-  return data.data;
-};
+  })).data;
 
 // ============================================
 // DOCUMENTOS DAS MULTAS
@@ -179,42 +103,33 @@ export const deleteFine = async (id) => {
 // Listar documentos de uma multa
 export const getFineDocuments = async (fineId, category = null) => {
   const params = category ? `?category=${category}` : '';
-  const data = await fetchAPI(`/fines/${fineId}/documents${params}`);
-  return data.data;
+  return (await apiRequest(`/api/fines/${fineId}/documents${params}`)).data;
 };
 
 // Adicionar documento
-export const addFineDocument = async (fineId, documentData) => {
-  const data = await fetchAPI(`/fines/${fineId}/documents`, {
+export const addFineDocument = async (fineId, documentData) =>
+  (await apiRequest(`/api/fines/${fineId}/documents`, {
     method: 'POST',
-    body: JSON.stringify(documentData),
-  });
-  return data.data;
-};
+    body: documentData,
+  })).data;
 
 // Deletar documento
-export const deleteFineDocument = async (fineId, documentId) => {
-  const data = await fetchAPI(`/fines/${fineId}/documents/${documentId}`, {
+export const deleteFineDocument = async (fineId, documentId) =>
+  (await apiRequest(`/api/fines/${fineId}/documents/${documentId}`, {
     method: 'DELETE',
-  });
-  return data.data;
-};
+  })).data;
 
 // ============================================
 // LOGS DAS MULTAS
 // ============================================
 
 // Listar logs de uma multa
-export const getFineLogs = async (fineId) => {
-  const data = await fetchAPI(`/fines/${fineId}/logs`);
-  return data.data;
-};
+export const getFineLogs = async (fineId) =>
+  (await apiRequest(`/api/fines/${fineId}/logs`)).data;
 
 // Listar todos os logs
-export const getAllFineLogs = async (limit = 100, offset = 0) => {
-  const data = await fetchAPI(`/fines/logs/all?limit=${limit}&offset=${offset}`);
-  return data.data;
-};
+export const getAllFineLogs = async (limit = 100, offset = 0) =>
+  (await apiRequest(`/api/fines/logs/all?limit=${limit}&offset=${offset}`)).data;
 
 // ============================================
 // CONSTANTES
@@ -260,4 +175,3 @@ export const DOCUMENT_CATEGORIES = {
   COMPROVANTE: 'comprovante',
   OUTRO: 'outro'
 };
-

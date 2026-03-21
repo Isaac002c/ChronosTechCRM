@@ -1,102 +1,43 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL + '/api';
-
-// Helper para obter o token
-const getToken = () => {
-  if (typeof document !== 'undefined') {
-    // Primeiro tenta localStorage (onde o login salva)
-    const localToken = localStorage.getItem('auth-token') || localStorage.getItem('token');
-    if (localToken) return localToken;
-    
-    // Depois tenta cookie (suporta ambos os nomes)
-    const cookies = document.cookie.split('; ');
-    const tokenCookie = cookies.find(row => row.startsWith('auth-token=') || row.startsWith('token='));
-    return tokenCookie ? tokenCookie.split('=')[1] : null;
-  }
-  return null;
-};
-
-// Helper para requisições
-const fetchAPI = async (endpoint, options = {}) => {
-  const token = getToken();
-  
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...options.headers,
-    },
-    credentials: 'include',
-  });
-  
-  const data = await response.json();
-  
-  if (!response.ok) {
-    throw new Error(data.error || 'Erro na requisição');
-  }
-  
-  return data;
-};
-
-// ============================================
-// DOCUMENTS API
-// ============================================
+import { apiRequest } from './api.js';
 
 // Listar todos os documentos
 export const getDocuments = async (filters = {}) => {
   const params = new URLSearchParams(filters).toString();
-  const endpoint = params ? `/documents?${params}` : '/documents';
-  const data = await fetchAPI(endpoint);
-  return data.data;
+  return (await apiRequest(`/api/documents${params ? `?${params}` : ''}`)).data;
 };
 
 // Buscar documento por ID
-export const getDocumentById = async (id) => {
-  const data = await fetchAPI(`/documents/${id}`);
-  return data.data;
-};
+export const getDocumentById = async (id) =>
+  (await apiRequest(`/api/documents/${id}`)).data;
 
 // Buscar documentos por contrato
-export const getDocumentsByContract = async (contractId) => {
-  const data = await fetchAPI(`/documents/contract/${contractId}`);
-  return data.data;
-};
+export const getDocumentsByContract = async (contractId) =>
+  (await apiRequest(`/api/documents/contract/${contractId}`)).data;
 
 // Buscar documentos por cliente
-export const getDocumentsByClient = async (clientId) => {
-  const data = await fetchAPI(`/documents/client/${clientId}`);
-  return data.data;
-};
+export const getDocumentsByClient = async (clientId) =>
+  (await apiRequest(`/api/documents/client/${clientId}`)).data;
 
 // Estatísticas de documentos
-export const getDocumentStats = async () => {
-  const data = await fetchAPI('/documents/stats');
-  return data.data;
-};
+export const getDocumentStats = async () =>
+  (await apiRequest('/api/documents/stats')).data;
 
 // Criar documento
-export const createDocument = async (documentData) => {
-  const data = await fetchAPI('/documents', {
+export const createDocument = async (documentData) =>
+  (await apiRequest('/api/documents', {
     method: 'POST',
-    body: JSON.stringify(documentData),
-  });
-  return data.data;
-};
+    body: documentData,
+  })).data;
 
 // Atualizar documento
-export const updateDocument = async (id, documentData) => {
-  const data = await fetchAPI(`/documents/${id}`, {
+export const updateDocument = async (id, documentData) =>
+  (await apiRequest(`/api/documents/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(documentData),
-  });
-  return data.data;
-};
+    body: documentData,
+  })).data;
 
 // Deletar documento
-export const deleteDocument = async (id) => {
-  const data = await fetchAPI(`/documents/${id}`, {
+export const deleteDocument = async (id) =>
+  (await apiRequest(`/api/documents/${id}`, {
     method: 'DELETE',
-  });
-  return data.data;
-};
-
+  })).data;

@@ -1,17 +1,17 @@
-# API Integration Fix - COMPLETE ✓
+# API Standardization TODO
 
-## Summary:
-✅ Updated all 9 frontend API files (`app/lib/*.js`) to use consistent `const API_URL = process.env.NEXT_PUBLIC_API_URL + '/api';`
+## Plan Steps
+- ✅ Step 1: Replace targetsAPI.js entirely with provided clean version
+- ✅ Step 2: Refactor sellersAPI.js to use apiRequest
+- ✅ Step 3: Refactor servicesAPI.js to use apiRequest
+- ✅ Step 4: Refactor leadsAPI.js to use apiRequest
+- ✅ Step 5: Refactor forecastAPI.js to use apiRequest
+- ✅ Step 6: Refactor contractsAPI.js to use apiRequest
+- ✅ Step 7: Refactor documentsAPI.js to use apiRequest
+- ✅ Step 8: Refactor finesAPI.js to use apiRequest
+- ✅ Step 9: Refactor saasAPI.js to use apiRequest
+- ✅ Step 10: Refactor usersAPI.js to use apiRequest
+- [ ] Step 11: Verify all files import apiRequest, no direct fetch left (search_files check)
+- [ ] Step 12: Test - run app
 
-✅ Fixed duplicate `/api/` paths in targetsAPI.js (9 endpoints standardized to `/targets/*`)
-
-## Final Status:
-- [x] Step 1: Create TODO.md 
-- [x] Step 2: Read inconsistent files
-- [x] Step 3: Edit 7 files API_URL
-- [x] Step 4: Fix targetsAPI.js paths (full recreate)
-- [x] Step 5: Verified no duplicates (search_files confirmed consistency)
-- [x] Step 6: Ready for testing - run `cd saas-multitenant && npm run dev`
-- [x] Step 7: Task complete
-
-**No other duplicates found. Frontend-backend integration fixed!**
+**Progress: Final verification**
