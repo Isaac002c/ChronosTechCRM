@@ -1,6 +1,6 @@
 import { apiRequest } from './api.js';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// Removed hardcoded localhost - uses apiRequest with NEXT_PUBLIC_API_URL from api.js
 
 // ========== SELLERS API ==========
 
