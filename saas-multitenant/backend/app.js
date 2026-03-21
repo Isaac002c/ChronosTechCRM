@@ -1,9 +1,9 @@
 // ============================================
 // ChronosTech CRM - Express Backend
-// app.js - Final Version (Render Ready)
+// FINAL VERSION (CORS 100% FUNCIONAL)
 // ============================================
 
-require('dns').setDefaultResultOrder('ipv4first'); // força IPv4 primeiro
+require('dns').setDefaultResultOrder('ipv4first');
 require('dotenv').config({ path: __dirname + '/.env' });
 
 const express = require('express');
@@ -21,23 +21,19 @@ const targetsRoutes = require('./routes/targetsRoutes');
 const sellersRoutes = require('./routes/sellersRoutes');
 const forecastRoutes = require('./routes/forecastRoutes');
 
-// Novas rotas do módulo de multas
 const clientRoutes = require('./routes/clientRoutes');
 const contractRoutes = require('./routes/contractRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 
-// Rotas SaaS
 const saasRoutes = require('./routes/saasRoutes');
-
-// Rotas de gerenciamento de usuários
 const userManagementRoutes = require('./routes/userManagementRoutes');
 const finesRoutes = require('./routes/finesRoutes');
 
 const app = express();
 
 // ============================================
-// CORS FIX DEFINITIVO (Render/Vercel Compatible)
+// 🔥 CORS CONFIG (CORRETO MESMO)
 // ============================================
 
 const allowedOrigins = [
@@ -46,51 +42,49 @@ const allowedOrigins = [
   'https://chronos-tech-crm.vercel.app'
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
-    // permite requests sem origin (Postman/mobile)
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
-      console.log('CORS BLOCKED:', origin);
+      console.log('❌ CORS BLOCKED:', origin);
       return callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
 
-// RESOLVE PREFLIGHT (OPTIONS)
-app.options('*', cors());
+// 🔥 MUITO IMPORTANTE: aplicar ANTES DE TUDO
+app.use(cors(corsOptions));
+
+// 🔥 PREFLIGHT CORRETO (USA A MESMA CONFIG)
+app.options('*', cors(corsOptions));
 
 // ============================================
-// CONFIGURAÇÕES
+// MIDDLEWARES
 // ============================================
 
-// --- 2. Body parsers ---
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// --- 3. Cookie parser ---
 app.use(cookieParser());
 
-// --- 4. Logging de requisições ---
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
 // ============================================
-// ROTAS PÚBLICAS (Auth)
+// ROTAS
 // ============================================
 
+// Públicas
 app.use('/auth', authRoutes);
 
-// ============================================
-// ROTAS PROTEGIDAS (Multi-tenant)
-// ============================================
-
+// Protegidas
 app.use('/api', tenantContext);
 
 app.use('/api/leads', leadsRoutes);
@@ -100,23 +94,17 @@ app.use('/api/forecast', forecastRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
-// Módulo de multas
 app.use('/api/clients', clientRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/services', serviceRoutes);
 
-// SaaS
 app.use('/api', saasRoutes);
-
-// Multas
 app.use('/api/fines', finesRoutes);
-
-// Gestão de usuários
 app.use('/api/users/management', userManagementRoutes);
 
 // ============================================
-// 404 Handler
+// 404
 // ============================================
 
 app.use((req, res) => {
@@ -124,25 +112,20 @@ app.use((req, res) => {
 });
 
 // ============================================
-// Global Error Handler
+// GLOBAL ERROR HANDLER
 // ============================================
 
 app.use((err, req, res, next) => {
   console.error('[GLOBAL ERROR]', err);
 
-  const message = process.env.NODE_ENV === 'production'
-    ? 'Erro interno do servidor'
-    : err.message;
-
   res.status(err.status || 500).json({
     success: false,
-    error: message,
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+    error: err.message || 'Erro interno do servidor',
   });
 });
 
 // ============================================
-// START SERVER (CORRIGIDO PRA RENDER)
+// START SERVER
 // ============================================
 
 const PORT = process.env.PORT || 5000;
@@ -153,11 +136,9 @@ const PORT = process.env.PORT || 5000;
     console.log('✅ Conectado ao Banco de Dados');
   } catch (err) {
     console.error('❌ Erro ao conectar no banco:', err.message);
-    // NÃO derruba o servidor (IMPORTANTE pro Render)
   }
 
   app.listen(PORT, () => {
     console.log(`🚀 CRM rodando na porta ${PORT}`);
   });
 })();
-
