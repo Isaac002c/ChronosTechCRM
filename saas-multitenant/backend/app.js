@@ -39,7 +39,7 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://chronos-tech-crm.vercel.app'
+'https://crm.chronostek.com.br'
 ];
 
 const corsOptions = {

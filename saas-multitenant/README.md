@@ -1,126 +1,110 @@
-# Chronos Tech CRM
+Chronos Tech CRM
 
-CRM SaaS multitenant desenvolvido com Next.js 14 e Express.
+Sistema de CRM SaaS com arquitetura multitenant, voltado para gestão de leads, pipeline comercial e análise de performance.
 
----
+Visão Geral
 
-##  Visão Geral
+O Chronos Tech CRM é uma aplicação web que permite que múltiplas empresas utilizem a mesma instância do sistema com isolamento completo de dados. A proposta é oferecer uma base escalável para operação comercial, com foco em organização de leads e visibilidade do funil de vendas.
 
-O Chronos Tech CRM é um sistema CRM modular com arquitetura **multitenant**, permitindo que múltiplas empresas (tenants) utilizem a mesma instância do sistema com dados isolados.
+A aplicação é dividida em frontend (Next.js) e backend (Express), com persistência em PostgreSQL.
 
-### Tecnologias
+Stack
+Frontend: Next.js 14 (App Router)
+Backend: Node.js + Express
+Banco de dados: PostgreSQL (Supabase)
+Autenticação: JWT com cookies HTTP-only
+Deploy: Vercel (frontend) e Render (backend)
+Estrutura do Projeto
+ChronosTechCRM/
+└── saas-multitenant/
+    ├── app/                    # Frontend (Next.js)
+    │   ├── components/         # Componentes reutilizáveis
+    │   ├── dashboard/          # Dashboard principal
+    │   ├── leads/              # Módulo de leads
+    │   ├── login/              # Autenticação
+    │   ├── register/
+    │   ├── layout.jsx
+    │   ├── page.jsx
+    │   └── globals.css
+    │
+    ├── backend/                # API (Express)
+    │   ├── config/             # Configuração (DB, etc)
+    │   ├── controllers/        # Regras de negócio
+    │   ├── database/           # Scripts SQL
+    │   ├── middlewares/        # Middlewares (tenant, auth)
+    │   ├── models/             # Acesso a dados
+    │   ├── routes/             # Rotas da API
+    │   ├── services/           # Camada de serviço
+    │   └── app.js              # Entry point do servidor
+    │
+    ├── .env
+    ├── package.json
+    └── README.md
+Módulo de Leads
 
-- **Frontend**: Next.js 14 (App Router)
-- **Backend**: Node.js + Express
-- **Banco de Dados**: PostgreSQL (Supabase)
-- **Autenticação**: JWT com cookies
+O módulo de leads concentra a maior parte da funcionalidade atual do sistema:
 
----
+Overview: visão geral com métricas e distribuição de leads
+Acquisition: análise de origem e conversão
+Pipeline: gerenciamento visual do funil (Kanban)
+Performance: acompanhamento de desempenho da equipe
+Reports: geração de relatórios
+Multitenancy
 
-##  Estrutura do Projeto
+O isolamento de dados é feito por tenant utilizando middleware no backend.
 
-```
-ChronosTechCRM/saas-multitenant/
-├── app/                    # Frontend (Next.js 14)
-│   ├── components/         # Componentes compartilhados
-│   │   ├── Header.jsx     # Header global
-│   │   └── ModuleLayout.jsx # Layout de módulo
-│   ├── dashboard/         # Página principal
-│   ├── leads/             # Módulo Leads
-│   │   ├── Overview.jsx   # Visão Geral
-│   │   ├── Acquisition.jsx # Aquisição & Funil
-│   │   ├── Pipeline.jsx   # Pipeline Kanban
-│   │   ├── Performance.jsx # Performance
-│   │   └── Reports.jsx    # Relatórios
-│   ├── login/             # Página de login
-│   ├── register/          # Página de cadastro
-│   ├── layout.jsx         # Layout raiz
-│   ├── page.jsx           # Landing page
-│   └── globals.css        # Estilos globais
-│
-├── backend/               # Backend (Express)
-│   ├── config/
-│   │   └── db.js          # Conexão com banco
-│   ├── controllers/       # Controllers
-│   ├── database/
-│   │   └── leads_table.sql # Script SQL
-│   ├── middlewares/
-│   │   └── tenantContext.js # Multitenancy
-│   ├── models/           # Modelos do banco
-│   ├── routes/            # Rotas da API
-│   │   ├── authRoutes.js  # Autenticação
-│   │   ├── leadsRoutes.js # Leads API
-│   │   └── ...
-│   ├── services/          # Serviços
-│   └── app.js             # Servidor principal
-│
-├── .env                   # Variáveis de ambiente
-├── package.json
-└── README.md
-```
+Fluxo:
 
----
+O usuário realiza login
+O tenant_id é associado à sessão (cookie)
+As requisições incluem o identificador do tenant
+O backend filtra todas as operações com base nesse identificador
 
-##  Módulo Leads
+Middleware responsável: tenantContext.js
 
-O módulo Leads possui 5 abas:
+Execução local
+Pré-requisitos
+Node.js 18+
+PostgreSQL (ou instância no Supabase)
+Configuração
 
-| Aba | Descrição |
-|-----|-----------|
-| **Overview** | Métricas gerais, KPIs, leads por status |
-| **Acquisition** | Análise de aquisição e conversão |
-| **Pipeline** | Kanban visual de oportunidades |
-| **Performance** | Performance da equipe |
-| **Reports** | Relatórios e análises |
+Criar arquivo .env na raiz do projeto:
 
----
-
-##  Multitenancy
-
-O sistema utiliza middleware `tenantContext` para isolar dados por tenant:
-
-1. Usuário faz login → recebe `tenant_id` no cookie
-2. Todas requisições incluem header `x-tenant-id`
-3. Backend filtra dados pelo `tenant_id`
-
----
-
-##  Como Rodar
-
-### Pré-requisitos
-
-- Node.js 
-- Banco de dados PostgreSQL (Supabase)
-
-### Configuração
-
-1. Clone o projeto
-2. Configure o arquivo `.env`:
-
-```env
 DATABASE_URL=postgresql://postgres:[SENHA]@db.[PROJETO].supabase.co:5432/postgres
-JWT_SECRET=[SUA_CHAVE_SECRETA]
+JWT_SECRET=sua_chave_secreta
 PORT=3000
-```
+Banco de dados
 
-3. Execute o script SQL em `backend/database/leads_table.sql` no banco
+Executar o script:
 
-### Iniciar Backend
-
-```bash
+backend/database/leads_table.sql
+Backend
 cd saas-multitenant
 node backend/app.js
-```
 
-O backend roda na porta **3000**.
+Disponível em: http://localhost:3000
 
-### Iniciar Frontend
-
-```bash
+Frontend
 cd saas-multitenant
 npm run dev -- -p 3001
-```
 
-O frontend roda na porta **3001**.
+Disponível em: http://localhost:3001
 
----
+Deploy
+
+A aplicação está preparada para separação de serviços:
+
+Frontend: Vercel
+Backend: Render
+Banco: Supabase
+Variáveis de ambiente relevantes
+DATABASE_URL
+JWT_SECRET
+FRONTEND_URL
+CORS_ORIGIN
+Roadmap
+Módulo de contratos
+Módulo financeiro
+Controle de permissões (RBAC)
+Integrações externas (webhooks)
+Integração com canais de comunicação
