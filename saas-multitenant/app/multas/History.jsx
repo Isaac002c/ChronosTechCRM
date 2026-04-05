@@ -1,338 +1,227 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getActivityLogs, getActivityStats, getEntityActivity } from '../lib/saasAPI';
+import { getAllFineLogs, getFineLogs, FINE_STATUS_LABELS, FINE_STAGE_LABELS } from '../lib/finesAPI';
+
+const ACTION_LABELS = {
+  created: 'CriaÃ§Ã£o',
+  status_changed: 'Status alterado',
+  stage_changed: 'EstÃ¡gio alterado',
+  document_added: 'Documento adicionado',
+  updated: 'AtualizaÃ§Ã£o',
+  deleted: 'ExclusÃ£o'
+};
+
+const ACTION_COLORS = {
+  created: '#22c55e',
+  status_changed: '#3b82f6',
+  stage_changed: '#8b5cf6',
+  document_added: '#f59e0b',
+  updated: '#06b6d4',
+  deleted: '#ef4444'
+};
+
+const ACTION_ICONS = {
+  created: 'âœš',
+  status_changed: 'â†”',
+  stage_changed: 'â†‘',
+  document_added: 'ðŸ“„',
+  updated: 'âœŽ',
+  deleted: 'âœ•'
+};
+
+const PAGE_SIZE = 20;
 
 export default function MultasHistory() {
   const [logs, setLogs] = useState([]);
-  const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [filters, setFilters] = useState({
-    entity_type: '',
-    action: '',
-    date_range: '30'
-  });
-  
-  // Modal de detalhes
-  const [selectedLog, setSelectedLog] = useState(null);
-  const [entityLogs, setEntityLogs] = useState([]);
-  const [loadingEntityLogs, setLoadingEntityLogs] = useState(false);
+
+  // Filtros
+  const [filters, setFilters] = useState({ action: '', days: '30' });
 
   useEffect(() => {
-    loadData();
-  }, [page, filters]);
+    loadLogs();
+  }, [page]);
 
-  const loadData = async () => {
+  const loadLogs = async () => {
     try {
       setLoading(true);
-      const logFilters = {
-        page,
-        limit: 20,
-        entity_type: filters.entity_type,
-        action: filters.action,
-        days: parseInt(filters.date_range)
-      };
-      const [logsData, statsData] = await Promise.all([
-        getActivityLogs(logFilters),
-        getActivityStats(parseInt(filters.date_range))
-      ]);
-      setLogs(logsData.logs || []);
-      setTotalPages(logsData.totalPages || 1);
-      setStats(statsData || []);
+      setError(null);
+      const offset = (page - 1) * PAGE_SIZE;
+      const data = await getAllFineLogs(PAGE_SIZE, offset);
+      // getAllFineLogs retorna { data: [...], total } ou array direto
+      if (Array.isArray(data)) {
+        setLogs(data);
+        setTotal(data.length);
+      } else {
+        setLogs(data?.data || data?.logs || []);
+        setTotal(data?.total || 0);
+      }
     } catch (err) {
-      console.error('Erro ao carregar dados:', err);
+      console.error('Erro ao carregar histÃ³rico:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleViewEntityLogs = async (log) => {
-    if (!log.entity_type || !log.entity_id) return;
-    
-    setSelectedLog(log);
-    setLoadingEntityLogs(true);
-    try {
-      const data = await getEntityActivity(log.entity_type, log.entity_id);
-      setEntityLogs(data || []);
-    } catch (err) {
-      console.error('Erro ao buscar logs da entidade:', err);
-      setEntityLogs([]);
-    } finally {
-      setLoadingEntityLogs(false);
-    }
+  const applyFilters = () => {
+    setPage(1);
+    loadLogs();
+  };
+
+  const clearFilters = () => {
+    setFilters({ action: '', days: '30' });
+    setPage(1);
+    loadLogs();
   };
 
   const formatDate = (date) => {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
   };
 
-  const getActionIcon = (action) => {
-    const iconMap = {
-      'create': '[+]',
-      'update': '[>]',
-      'delete': '[-]',
-      'login': '[L]',
-      'logout': '[X]',
-      'read': '[v]',
-      'upload': '[U]',
-      'download': '[D]',
-      'update_password': '[P]'
-    };
-    return iconMap[action] || '[-]';
-  };
+  // Filtro local por aÃ§Ã£o e dias (jÃ¡ que o endpoint nÃ£o filtra)
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - parseInt(filters.days || 30));
 
-  const getActionLabel = (action) => {
-    const labels = {
-      'create': 'Criação',
-      'update': 'Atualização',
-      'delete': 'Exclusão',
-      'login': 'Login',
-      'logout': 'Logout',
-      'read': 'Visualização',
-      'upload': 'Upload',
-      'download': 'Download',
-      'update_password': 'Senha alterada'
-    };
-    return labels[action] || action;
-  };
+  const filteredLogs = logs.filter(log => {
+    const matchAction = !filters.action || log.action === filters.action;
+    const matchDate = !log.created_at || new Date(log.created_at) >= cutoff;
+    return matchAction && matchDate;
+  });
 
-  const getEntityLabel = (type) => {
-    const labels = {
-      'contract': 'Contrato',
-      'client': 'Cliente',
-      'document': 'Documento',
-      'user': 'Usuário',
-      'company': 'Empresa'
-    };
-    return labels[type] || type;
-  };
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const getActionColor = (action) => {
-    const colors = {
-      'create': '#22c55e',
-      'update': '#3b82f6',
-      'delete': '#ef4444',
-      'login': '#8b5cf6',
-      'logout': '#6b7280',
-      'read': '#64748b',
-      'upload': '#f59e0b',
-      'download': '#06b6d4'
-    };
-    return colors[action] || '#64748b';
+  const renderChangeDetail = (log) => {
+    if (log.old_value && log.new_value) {
+      const oldLabel = FINE_STATUS_LABELS[log.old_value] || FINE_STAGE_LABELS[log.old_value] || log.old_value;
+      const newLabel = FINE_STATUS_LABELS[log.new_value] || FINE_STAGE_LABELS[log.new_value] || log.new_value;
+      return (
+        <span style={{ fontSize: 12, color: '#6b7280' }}>
+          {oldLabel} â†’ <strong style={{ color: '#111' }}>{newLabel}</strong>
+        </span>
+      );
+    }
+    if (log.new_value) {
+      return <span style={{ fontSize: 12, color: '#6b7280' }}>{log.new_value}</span>;
+    }
+    return null;
   };
 
   if (loading) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Carregando histórico...</p>
+        <p>Carregando histÃ³rico...</p>
       </div>
     );
   }
 
   return (
     <div className="multas-history">
-      {/* Estatísticas de atividades */}
-      <div className="activity-stats">
-        <h3>Atividades Recentes</h3>
-        <div className="stats-grid">
-          {stats.map((stat) => (
-            <div key={stat.action} className="stat-item">
-              <span className="stat-icon">{getActionIcon(stat.action)}</span>
-              <span className="stat-count">{stat.count}</span>
-              <span className="stat-label">{getActionLabel(stat.action)}</span>
-            </div>
-          ))}
+
+      {/* Filtros */}
+      <div className="filters-section">
+        <div className="filter-group">
+          <label>AÃ§Ã£o</label>
+          <select value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })}>
+            <option value="">Todas</option>
+            {Object.entries(ACTION_LABELS).map(([val, label]) => (
+              <option key={val} value={val}>{label}</option>
+            ))}
+          </select>
         </div>
+        <div className="filter-group">
+          <label>PerÃ­odo</label>
+          <select value={filters.days} onChange={(e) => setFilters({ ...filters, days: e.target.value })}>
+            <option value="7">Ãšltimos 7 dias</option>
+            <option value="30">Ãšltimos 30 dias</option>
+            <option value="90">Ãšltimos 90 dias</option>
+            <option value="365">Ãšltimo ano</option>
+          </select>
+        </div>
+        <button onClick={applyFilters} className="btn-filter">Filtrar</button>
+        <button onClick={clearFilters} className="btn-reset">Limpar</button>
       </div>
 
       {/* Erro */}
       {error && (
         <div className="error-message">
           <p>{error}</p>
-          <button onClick={() => setError(null)}>✕</button>
+          <button onClick={() => setError(null)}>âœ•</button>
         </div>
       )}
 
-      {/* Filtros */}
-      <div className="filters-section">
-        <div className="filter-group">
-          <label>Tipo de Entidade</label>
-          <select
-            value={filters.entity_type}
-            onChange={(e) => setFilters({ ...filters, entity_type: e.target.value })}
-          >
-            <option value="">Todas</option>
-            <option value="fine">Multas</option>
-            <option value="client">Clientes</option>
-            <option value="contract">Contratos</option>
-            <option value="document">Documentos</option>
-            <option value="user">Usuários</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>Ação</label>
-          <select
-            value={filters.action}
-            onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-          >
-            <option value="">Todas</option>
-            <option value="create">Criação</option>
-            <option value="update">Atualização</option>
-            <option value="delete">Exclusão</option>
-            <option value="login">Login</option>
-            <option value="logout">Logout</option>
-            <option value="status_changed">Status alterado</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>Período</label>
-          <select
-            value={filters.date_range}
-            onChange={(e) => setFilters({ ...filters, date_range: e.target.value })}
-          >
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
-            <option value="90">Últimos 90 dias</option>
-            <option value="365">Último ano</option>
-          </select>
-        </div>
-        <button 
-          className="btn-reset" 
-          onClick={() => setFilters({ entity_type: '', action: '', date_range: '30' })}
-        >
-          Limpar filtros
-        </button>
+      {/* Resumo */}
+      <div style={{ marginBottom: 16, color: '#6b7280', fontSize: 14 }}>
+        {filteredLogs.length} atividade{filteredLogs.length !== 1 ? 's' : ''} encontrada{filteredLogs.length !== 1 ? 's' : ''}
       </div>
 
-      {/* Lista de Atividades */}
+      {/* Lista de atividades */}
       <div className="activity-list">
-        {logs.length === 0 ? (
+        {filteredLogs.length === 0 ? (
           <div className="empty-state">
-            <p>Nenhuma atividade registrada no período</p>
+            <p>Nenhuma atividade registrada no perÃ­odo</p>
           </div>
         ) : (
-          logs.map((log) => (
-            <div 
-              key={log.id} 
-              className="activity-card"
-              onClick={() => handleViewEntityLogs(log)}
-            >
-              <div 
+          filteredLogs.map((log) => (
+            <div key={log.id} className="activity-card">
+              <div
                 className="activity-icon"
-                style={{ backgroundColor: `${getActionColor(log.action)}20`, color: getActionColor(log.action) }}
+                style={{
+                  backgroundColor: `${ACTION_COLORS[log.action] || '#6b7280'}20`,
+                  color: ACTION_COLORS[log.action] || '#6b7280',
+                  minWidth: 36, height: 36, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16
+                }}
               >
-                {getActionIcon(log.action)}
+                {ACTION_ICONS[log.action] || 'Â·'}
               </div>
-              <div className="activity-content">
-                <div className="activity-header">
-                  <span 
-                    className="activity-action"
-                    style={{ color: getActionColor(log.action) }}
-                  >
-                    {getActionLabel(log.action)}
+              <div className="activity-content" style={{ flex: 1 }}>
+                <div className="activity-header" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, color: ACTION_COLORS[log.action] || '#111' }}>
+                    {ACTION_LABELS[log.action] || log.action}
                   </span>
-                  <span className="activity-entity">
-                    {getEntityLabel(log.entity_type)}
-                  </span>
+                  {log.field_name && log.field_name !== 'fine' && (
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>â€¢ {log.field_name}</span>
+                  )}
                 </div>
-                <p className="activity-description">{log.description}</p>
-                <div className="activity-meta">
-                  <span className="activity-user">
-                    [User] {log.user_name || log.user_email || 'Sistema'}
-                  </span>
-                  <span className="activity-date">
-                    {formatDate(log.created_at)}
-                  </span>
+                <div style={{ marginTop: 2 }}>
+                  {renderChangeDetail(log)}
+                </div>
+                <div className="activity-meta" style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 12, color: '#9ca3af' }}>
+                  <span>ðŸ‘¤ {log.user_name || log.user_email || 'Sistema'}</span>
+                  <span>ðŸ• {formatDate(log.created_at)}</span>
+                  {log.fine_id && (
+                    <span style={{ fontFamily: 'monospace' }}>#{log.fine_id.substring(0, 8)}</span>
+                  )}
                 </div>
               </div>
-              {log.entity_type && log.entity_id && (
-                <div className="activity-arrow">›</div>
-              )}
             </div>
           ))
         )}
       </div>
 
-      {/* Paginação */}
+      {/* PaginaÃ§Ã£o */}
       {totalPages > 1 && (
-        <div className="pagination">
-          <button 
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="btn-pagination"
-          >
-            ← Anterior
+        <div className="pagination" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 24, justifyContent: 'center' }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-pagination">
+            â† Anterior
           </button>
-          <span className="page-info">
-            Página {page} de {totalPages}
-          </span>
-          <button 
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="btn-pagination"
-          >
-            Próxima →
+          <span className="page-info">PÃ¡gina {page} de {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-pagination">
+            PrÃ³xima â†’
           </button>
-        </div>
-      )}
-
-      {/* Modal de Detalhes */}
-      {selectedLog && (
-        <div className="modal-overlay" onClick={() => setSelectedLog(null)}>
-          <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Histórico de {getEntityLabel(selectedLog.entity_type)}</h2>
-              <button onClick={() => setSelectedLog(null)} className="btn-close">[X]</button>
-            </div>
-            <div className="modal-body">
-              {loadingEntityLogs ? (
-                <div className="loading">Carregando...</div>
-              ) : entityLogs.length === 0 ? (
-                <p className="empty-state">Nenhum histórico encontrado</p>
-              ) : (
-                <div className="history-timeline">
-                  {entityLogs.map((log, index) => (
-                    <div key={log.id} className="timeline-item">
-                      <div className="timeline-marker">
-                        <span style={{ color: getActionColor(log.action) }}>
-                          {getActionIcon(log.action)}
-                        </span>
-                      </div>
-                      <div className="timeline-content">
-                        <div className="timeline-header">
-                          <span style={{ color: getActionColor(log.action) }}>
-                            {getActionLabel(log.action)}
-                          </span>
-                          <span className="timeline-date">
-                            {formatDate(log.created_at)}
-                          </span>
-                        </div>
-                        <p className="timeline-description">{log.description}</p>
-                        <span className="timeline-user">
-                          [User] {log.user_name || log.user_email || 'Sistema'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       )}
     </div>
   );
 }
-
