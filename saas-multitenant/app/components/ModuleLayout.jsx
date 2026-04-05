@@ -15,7 +15,6 @@ const moduleTabs = {
   multas: [
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'clients', label: 'Clientes' },
-    { key: 'contracts', label: 'Multas' },
     { key: 'documents', label: 'Documentos' },
     { key: 'history', label: 'Historico' },
   ],
@@ -29,14 +28,13 @@ const moduleTabs = {
 export default function ModuleLayout({ 
   children, 
   moduleKey = 'leads', 
-  moduleName = 'Módulo',
+  moduleName = 'MÃ³dulo',
   activeTab: externalActiveTab,
   onTabChange: externalOnTabChange 
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Obter aba padrão baseada no módulo
   const getDefaultTab = (module) => {
     const defaults = {
       leads: 'overview',
@@ -60,12 +58,10 @@ export default function ModuleLayout({
 
   return (
     <div className="module-container">
-      {/* Título do Módulo */}
       <div className="module-header">
         <h1 className="module-title">{moduleName}</h1>
       </div>
 
-      {/* Navegação Interna (Tabs) */}
       <div className="module-tabs">
         {tabs.map((tab) => (
           <button
@@ -78,7 +74,6 @@ export default function ModuleLayout({
         ))}
       </div>
 
-      {/* Conteúdo do Módulo */}
       <div className="module-content">
         {children}
       </div>

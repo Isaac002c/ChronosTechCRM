@@ -33,12 +33,15 @@ const createContract = async ({
   return result.rows[0];
 };
 
-// READ - Listar todos os contratos do tenant
+// READ - Listar todos os contratos do tenant (com service_name para gráfico de APRs)
 const getAllContracts = async (tenant_id) => {
   const result = await pool.query(
-    `SELECT c.*, cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone
+    `SELECT c.*, 
+            cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone,
+            s.name as service_name
      FROM contracts c
      LEFT JOIN clients cl ON c.client_id = cl.id
+     LEFT JOIN services s ON c.service_id = s.id
      WHERE c.tenant_id = $1
      ORDER BY c.created_at DESC`,
     [tenant_id]
@@ -49,9 +52,12 @@ const getAllContracts = async (tenant_id) => {
 // READ - Listar contratos com filtros
 const getContractsByFilter = async (tenant_id, filters = {}) => {
   let query = `
-    SELECT c.*, cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone
+    SELECT c.*, 
+           cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone,
+           s.name as service_name
     FROM contracts c
     LEFT JOIN clients cl ON c.client_id = cl.id
+    LEFT JOIN services s ON c.service_id = s.id
     WHERE c.tenant_id = $1
   `;
   
@@ -91,9 +97,12 @@ const getContractsByFilter = async (tenant_id, filters = {}) => {
 // READ - Buscar contrato por ID
 const getContractById = async (id, tenant_id) => {
   const result = await pool.query(
-    `SELECT c.*, cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone, cl.email as client_email
+    `SELECT c.*, 
+            cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone, cl.email as client_email,
+            s.name as service_name
      FROM contracts c
      LEFT JOIN clients cl ON c.client_id = cl.id
+     LEFT JOIN services s ON c.service_id = s.id
      WHERE c.id = $1 AND c.tenant_id = $2`,
     [id, tenant_id]
   );
@@ -103,9 +112,11 @@ const getContractById = async (id, tenant_id) => {
 // READ - Buscar contratos por cliente
 const getContractsByClient = async (client_id, tenant_id) => {
   const result = await pool.query(
-    `SELECT * FROM contracts 
-     WHERE client_id = $1 AND tenant_id = $2
-     ORDER BY created_at DESC`,
+    `SELECT c.*, s.name as service_name
+     FROM contracts c
+     LEFT JOIN services s ON c.service_id = s.id
+     WHERE c.client_id = $1 AND c.tenant_id = $2
+     ORDER BY c.created_at DESC`,
     [client_id, tenant_id]
   );
   return result.rows;
@@ -202,7 +213,30 @@ const getContractsGroupedByOrgan = async (tenant_id) => {
   return result.rows;
 };
 
-// READ - Contratos próximos ao vencimento (próximos 30 dias)
+// READ - APRs agrupados por estágio (para gráfico do dashboard)
+const getAPRsByStage = async (tenant_id) => {
+  const result = await pool.query(
+    `SELECT c.status, COUNT(*) as count
+     FROM contracts c
+     LEFT JOIN services s ON c.service_id = s.id
+     WHERE c.tenant_id = $1
+       AND UPPER(s.name) = 'MULTA'
+       AND c.status IN (
+         'APRS DEFESA PRÉVIA',
+         'DEFESA PRÉVIA - ANÁLISE',
+         'APRS 1 INSTÂNCIA',
+         '1 INSTÂNCIA - ANÁLISE',
+         'APRS 2 INSTÂNCIA',
+         '2 INSTÂNCIA -ANÁLISE'
+       )
+     GROUP BY c.status
+     ORDER BY c.status`,
+    [tenant_id]
+  );
+  return result.rows;
+};
+
+// READ - Contratos próximos ao vencimento
 const getContractsNearDueDate = async (tenant_id, days = 30) => {
   const result = await pool.query(
     `SELECT c.*, cl.name as client_name, cl.phone as client_phone
@@ -239,7 +273,6 @@ const getOverdueContracts = async (tenant_id) => {
 const getAlerts = async (tenant_id) => {
   const alerts = [];
   
-  // Contratos próximos ao vencimento (7 dias)
   const nearDue = await pool.query(
     `SELECT COUNT(*) as count FROM contracts
      WHERE tenant_id = $1 
@@ -259,7 +292,6 @@ const getAlerts = async (tenant_id) => {
     });
   }
   
-  // Contratos vencidos
   const overdue = await pool.query(
     `SELECT COUNT(*) as count FROM contracts
      WHERE tenant_id = $1 
@@ -278,7 +310,6 @@ const getAlerts = async (tenant_id) => {
     });
   }
   
-  // Contratos sem atualização há muito tempo (30 dias)
   const stale = await pool.query(
     `SELECT COUNT(*) as count FROM contracts
      WHERE tenant_id = $1 
@@ -302,18 +333,21 @@ const getAlerts = async (tenant_id) => {
 // UPDATE - Atualizar contrato
 const updateContract = async (id, { 
   organ, process_number, contract_number, infraction_type, 
-  vehicle_plate, vehicle_model, status, value, due_date, notes 
+  vehicle_plate, vehicle_model, status, value, due_date, notes,
+  numero_multa, deadline_date
 }, tenant_id) => {
   const result = await pool.query(
     `UPDATE contracts 
      SET organ = $1, process_number = $2, contract_number = $3,
          infraction_type = $4, vehicle_plate = $5, vehicle_model = $6,
          status = $7, value = $8, due_date = $9, notes = $10,
+         numero_multa = $11, deadline_date = $12,
          last_update = NOW(), updated_at = NOW()
-     WHERE id = $11 AND tenant_id = $12 RETURNING *`,
+     WHERE id = $13 AND tenant_id = $14 RETURNING *`,
     [
       organ, process_number, contract_number, infraction_type,
       vehicle_plate, vehicle_model, status, value, due_date, notes,
+      numero_multa, deadline_date,
       id, tenant_id
     ]
   );
@@ -353,6 +387,7 @@ module.exports = {
   countActiveContracts,
   getDashboardStats,
   getContractsGroupedByOrgan,
+  getAPRsByStage,
   getContractsNearDueDate,
   getOverdueContracts,
   getAlerts,
@@ -360,4 +395,3 @@ module.exports = {
   updateContractStatus,
   deleteContract
 };
-

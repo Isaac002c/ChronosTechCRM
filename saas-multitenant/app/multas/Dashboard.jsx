@@ -11,6 +11,17 @@ import {
   FINE_STAGE_LABELS
 } from '../lib/finesAPI';
 import { getClients } from '../lib/clientsAPI';
+import { getAllContracts } from '../lib/contractsAPI';
+
+// Labels dos estÃ¡gios APR usados nos contratos de MULTA
+const APR_STAGES = [
+  { key: 'APRS DEFESA PRÃ‰VIA',     label: 'APRS Defesa PrÃ©via',      color: '#6366f1' },
+  { key: 'DEFESA PRÃ‰VIA - ANÃLISE',label: 'Defesa PrÃ©via - AnÃ¡lise', color: '#8b5cf6' },
+  { key: 'APRS 1 INSTÃ‚NCIA',       label: 'APRS 1Âª InstÃ¢ncia',       color: '#f59e0b' },
+  { key: '1 INSTÃ‚NCIA - ANÃLISE',  label: '1Âª InstÃ¢ncia - AnÃ¡lise',  color: '#f97316' },
+  { key: 'APRS 2 INSTÃ‚NCIA',       label: 'APRS 2Âª InstÃ¢ncia',       color: '#ef4444' },
+  { key: '2 INSTÃ‚NCIA -ANÃLISE',   label: '2Âª InstÃ¢ncia - AnÃ¡lise',  color: '#dc2626' },
+];
 
 export default function MultasDashboard() {
   const [stats, setStats] = useState(null);
@@ -18,6 +29,7 @@ export default function MultasDashboard() {
   const [alerts, setAlerts] = useState([]);
   const [urgentFines, setUrgentFines] = useState([]);
   const [overdueFines, setOverdueFines] = useState([]);
+  const [aprStats, setAprStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
@@ -31,14 +43,16 @@ export default function MultasDashboard() {
     try {
       setLoading(true);
       setError(null);
-      const [dashboardData, organData, alertsData, urgentData, overdueData, clientsData] =
+
+      const [dashboardData, organData, alertsData, urgentData, overdueData, clientsData, contractsData] =
         await Promise.all([
-          getFineDashboard(),
-          getFinesByOrgan(),
-          getFineAlerts(),
-          getUrgentFines(7),
-          getOverdueFines(),
-          getClients()
+          getFineDashboard().catch(() => ({})),
+          getFinesByOrgan().catch(() => []),
+          getFineAlerts().catch(() => []),
+          getUrgentFines(7).catch(() => []),
+          getOverdueFines().catch(() => []),
+          getClients().catch(() => []),
+          getAllContracts().catch(() => []),
         ]);
 
       setStats({
@@ -49,6 +63,28 @@ export default function MultasDashboard() {
       setAlerts(alertsData || []);
       setUrgentFines(urgentData || []);
       setOverdueFines(overdueData || []);
+
+      // Calcular APRs a partir dos contratos de MULTA
+      const multaContracts = (contractsData || []).filter(
+        c => c.service_name?.toUpperCase() === 'MULTA' || c.tipo?.toUpperCase() === 'MULTA'
+      );
+
+      const aprCounts = APR_STAGES.map(stage => {
+        const count = multaContracts.filter(c => c.status === stage.key).length;
+        return { ...stage, count };
+      }).filter(s => s.count > 0);
+
+      // Se nÃ£o vier do contractsAPI, tenta calcular via dashboard stats
+      if (aprCounts.length === 0 && dashboardData) {
+        const fallback = APR_STAGES.map(stage => ({
+          ...stage,
+          count: dashboardData[stage.key] || 0
+        })).filter(s => s.count > 0);
+        setAprStats(fallback);
+      } else {
+        setAprStats(aprCounts);
+      }
+
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
       setError(err.message);
@@ -75,6 +111,11 @@ export default function MultasDashboard() {
   const getMaxOrganCount = () => {
     if (!contractsByOrgan.length) return 1;
     return Math.max(...contractsByOrgan.map(o => parseInt(o.count) || 0));
+  };
+
+  const getMaxAprCount = () => {
+    if (!aprStats.length) return 1;
+    return Math.max(...aprStats.map(s => s.count));
   };
 
   const openAlertsModal = (type) => {
@@ -126,7 +167,7 @@ export default function MultasDashboard() {
         </div>
       )}
 
-      {/* Cards de Stats â€” usando campos reais da API */}
+      {/* Cards de Stats */}
       <div className="dashboard-grid">
         <div className="stat-card">
           <div className="stat-content">
@@ -143,7 +184,7 @@ export default function MultasDashboard() {
         <div className="stat-card completed">
           <div className="stat-content">
             <h3>Deferidas</h3>
-            <p className="stat-value">{stats?.deferred_fines ?? stats?.deferido ?? 0}</p>
+            <p className="stat-value">{stats?.granted_fines ?? stats?.deferido ?? 0}</p>
           </div>
         </div>
         <div className="stat-card clients">
@@ -152,6 +193,39 @@ export default function MultasDashboard() {
             <p className="stat-value">{stats?.totalClients || 0}</p>
           </div>
         </div>
+      </div>
+
+      {/* GrÃ¡fico de APRs */}
+      <div className="charts-section">
+        <h3 className="section-title">Clientes por EstÃ¡gio APR</h3>
+        {aprStats.length > 0 ? (
+          <div className="organ-chart">
+            {aprStats.map((stage, index) => (
+              <div key={index} className="organ-bar-container">
+                <div className="organ-label">
+                  <span className="organ-name">{stage.label}</span>
+                  <span className="organ-count">{stage.count} cliente{stage.count !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="organ-bar-bg">
+                  <div
+                    className="organ-bar-fill"
+                    style={{
+                      width: `${(stage.count / getMaxAprCount()) * 100}%`,
+                      backgroundColor: stage.color
+                    }}
+                  ></div>
+                </div>
+                <div className="organ-value" style={{ color: stage.color, fontWeight: 600 }}>
+                  {stage.count}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-chart">
+            <p>Nenhum cliente em estÃ¡gio APR no momento</p>
+          </div>
+        )}
       </div>
 
       {/* GrÃ¡fico por Ã“rgÃ£o */}
@@ -183,7 +257,7 @@ export default function MultasDashboard() {
         )}
       </div>
 
-      {/* Multas Urgentes */}
+      {/* Multas com Prazo PrÃ³ximo */}
       {urgentFines.length > 0 && (
         <div className="charts-section">
           <h3 className="section-title">Multas com Prazo PrÃ³ximo (7 dias)</h3>
@@ -224,7 +298,7 @@ export default function MultasDashboard() {
                 {alertType === 'danger' && 'Multas Vencidas'}
                 {alertType === 'info' && 'InformaÃ§Ãµes'}
               </h2>
-              <button onClick={() => setShowAlertsModal(false)} className="btn-close">[X]</button>
+              <button onClick={() => setShowAlertsModal(false)} className="btn-close">âœ•</button>
             </div>
             <div className="modal-body">
               <table className="data-table">

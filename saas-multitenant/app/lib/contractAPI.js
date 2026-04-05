@@ -4,6 +4,10 @@ import { apiRequest } from './api.js';
 export const getAllContracts = async () =>
   (await apiRequest('/api/contracts')).data;
 
+// Get contracts by client
+export const getContractsByClient = async (clientId) =>
+  (await apiRequest(`/api/contracts/client/${clientId}`)).data;
+
 // Get contracts by service
 export const getContractsByService = async (serviceId) =>
   (await apiRequest(`/api/contracts/service/${serviceId}`)).data;
@@ -29,12 +33,8 @@ export const deleteContract = async (id) =>
   })).data;
 
 // Dashboard functions (stubs for compatibility)
-export const getContractDashboard = async () => ({}); 
-
+export const getContractDashboard = async () => ({});
 export const getContractsByOrgan = async () => ([]);
-
 export const getContractAlerts = async () => ([]);
-
 export const getContractsNearDue = async () => ([]);
-
 export const getOverdueContracts = async () => ([]);

@@ -17,15 +17,12 @@ import LeadsReports from '../leads/Reports';
 // Multas Components
 import MultasDashboard from '../multas/Dashboard';
 import MultasClients from '../multas/Clients';
-import MultasContracts from '../multas/Contracts';
 import MultasDocuments from '../multas/Documents';
-import MultasUsers from '../multas/Users';
 import MultasHistory from '../multas/History';
 
 // Settings Components
 import SettingsPage from '../settings/page';
 
-// Componentes placeholder para outros módulos
 const ComingSoon = ({ moduleName }) => (
   <div className="coming-soon">
     <div className="coming-soon-icon">[Em Breve]</div>
@@ -34,7 +31,6 @@ const ComingSoon = ({ moduleName }) => (
   </div>
 );
 
-// Mapeamento de módulos e suas páginas
 const modulePages = {
   leads: {
     name: 'Leads',
@@ -53,9 +49,7 @@ const modulePages = {
     pages: {
       dashboard: MultasDashboard,
       clients: MultasClients,
-      contracts: MultasContracts,
       documents: MultasDocuments,
-      users: MultasUsers,
       history: MultasHistory,
     }
   },
@@ -64,12 +58,11 @@ const modulePages = {
     pages: {
       general: SettingsPage,
       team: () => <ComingSoon moduleName="Equipe" />,
-      integrations: () => <ComingSoon moduleName="Integrações" />,
+      integrations: () => <ComingSoon moduleName="Integracoes" />,
     }
   },
 };
 
-// Função para obter a aba padrão baseada no módulo
 const getDefaultTab = (module) => {
   const defaults = {
     leads: 'overview',
@@ -88,12 +81,10 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Parâmetros da URL
   const currentModule = searchParams.get('module') || 'leads';
   const urlTab = searchParams.get('tab') || getDefaultTab(currentModule);
 
   useEffect(() => {
-    // Verificar autenticação
     const token = document.cookie.includes('auth-token');
     const userData = localStorage.getItem('user');
     const tenantData = localStorage.getItem('tenant');
@@ -114,7 +105,6 @@ function DashboardContent() {
 
   const handleLogout = async () => {
     try {
-      // Chamar logout no backend (porta 5000)
       await fetch('http://localhost:5000/auth/logout', {
         method: 'POST',
         credentials: 'include'
@@ -122,7 +112,6 @@ function DashboardContent() {
     } catch (err) {
       console.error('Erro ao fazer logout no backend:', err);
     } finally {
-      // Limpar localStorage - todos os tokens
       localStorage.removeItem('user');
       localStorage.removeItem('tenant');
       localStorage.removeItem('token');
@@ -130,7 +119,6 @@ function DashboardContent() {
       localStorage.removeItem('tenantId');
       localStorage.removeItem('tenant-id');
       
-      // Limpar cookies
       document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
       document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
       document.cookie = 'tenantId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
@@ -153,21 +141,17 @@ function DashboardContent() {
     );
   }
 
-  // Obter módulo atual
   const moduleData = modulePages[currentModule] || modulePages.leads;
   const defaultTab = getDefaultTab(currentModule);
   const ActivePage = moduleData.pages[activeTab] || moduleData.pages[defaultTab] || moduleData.pages.overview;
 
   return (
     <div className="app-container">
-      {/* Header Global */}
       <Header 
         user={user} 
         tenant={tenant} 
         onLogout={handleLogout} 
       />
-
-      {/* Área Principal com Margem */}
       <main className="main-area">
         <ModuleLayout
           moduleKey={currentModule}
@@ -194,4 +178,3 @@ export default function Dashboard() {
     </Suspense>
   );
 }
-
