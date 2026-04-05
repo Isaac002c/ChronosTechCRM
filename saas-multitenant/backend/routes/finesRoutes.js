@@ -4,11 +4,11 @@ const fineModel = require('../models/fineModels');
 const fineDocumentModel = require('../models/fineDocumentModels');
 const fineLogModel = require('../models/fineLogModels');
 const { checkPermission } = require('../middlewares/checkPermission');
-
+ 
 // ============================================
 // ROTAS DE MULTAS (FINES)
 // ============================================
-
+ 
 // GET /api/fines - Listar todas as multas
 router.get('/', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -32,7 +32,7 @@ router.get('/', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/stats - Estatísticas de multas
 router.get('/stats', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -57,7 +57,7 @@ router.get('/stats', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/dashboard - Dashboard stats
 router.get('/dashboard', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -88,7 +88,7 @@ router.get('/dashboard', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/alerts - Alertas de multas
 router.get('/alerts', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -100,7 +100,7 @@ router.get('/alerts', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/urgent - Multas urgentes
 router.get('/urgent', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -113,7 +113,7 @@ router.get('/urgent', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/waiting-document - Multas aguardando documento
 router.get('/waiting-document', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -125,7 +125,7 @@ router.get('/waiting-document', checkPermission('fines:read'), async (req, res) 
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/waiting-protocol - Multas aguardando protocolo
 router.get('/waiting-protocol', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -137,7 +137,7 @@ router.get('/waiting-protocol', checkPermission('fines:read'), async (req, res) 
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/overdue - Multas vencidas
 router.get('/overdue', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -149,7 +149,7 @@ router.get('/overdue', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/by-organ - Multas agrupadas por órgão
 router.get('/by-organ', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -161,7 +161,7 @@ router.get('/by-organ', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/by-seller - Multas agrupadas por vendedor
 router.get('/by-seller', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -173,7 +173,7 @@ router.get('/by-seller', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/deferment-rate - Taxa de deferimento
 router.get('/deferment-rate', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -185,7 +185,27 @@ router.get('/deferment-rate', checkPermission('fines:read'), async (req, res) =>
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
+// ============================================
+// ROTA DE LOGS GLOBAIS - DEVE VIR ANTES DE /:id
+// ============================================
+ 
+// GET /api/fines/logs/all - Listar todos os logs
+router.get('/logs/all', checkPermission('fines:read'), async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { limit, offset } = req.query;
+    
+    const logs = await fineLogModel.getAllLogs(tenantId, parseInt(limit) || 100, parseInt(offset) || 0);
+    const total = await fineLogModel.countLogs(tenantId);
+    
+    res.json({ success: true, data: logs, total });
+  } catch (err) {
+    console.error('Erro ao buscar logs:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+ 
 // GET /api/fines/client/:clientId - Buscar multas por cliente
 router.get('/client/:clientId', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -199,7 +219,7 @@ router.get('/client/:clientId', checkPermission('fines:read'), async (req, res) 
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // GET /api/fines/seller/:sellerId - Buscar multas por vendedor
 router.get('/seller/:sellerId', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -213,7 +233,11 @@ router.get('/seller/:sellerId', checkPermission('fines:read'), async (req, res) 
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
+// ============================================
+// ROTAS COM :id - SEMPRE POR ÚLTIMO
+// ============================================
+ 
 // GET /api/fines/:id - Buscar multa por ID
 router.get('/:id', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -245,7 +269,7 @@ router.get('/:id', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // POST /api/fines - Criar nova multa
 router.post('/', checkPermission('fines:create'), async (req, res) => {
   try {
@@ -302,7 +326,7 @@ router.post('/', checkPermission('fines:create'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // PUT /api/fines/:id - Atualizar multa
 router.put('/:id', checkPermission('fines:update'), async (req, res) => {
   try {
@@ -354,7 +378,7 @@ router.put('/:id', checkPermission('fines:update'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // PATCH /api/fines/:id/status - Atualizar status
 router.patch('/:id/status', checkPermission('fines:update'), async (req, res) => {
   try {
@@ -389,7 +413,7 @@ router.patch('/:id/status', checkPermission('fines:update'), async (req, res) =>
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // PATCH /api/fines/:id/stage - Atualizar estágio
 router.patch('/:id/stage', checkPermission('fines:update'), async (req, res) => {
   try {
@@ -424,7 +448,7 @@ router.patch('/:id/stage', checkPermission('fines:update'), async (req, res) => 
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // DELETE /api/fines/:id - Deletar multa
 router.delete('/:id', checkPermission('fines:delete'), async (req, res) => {
   try {
@@ -446,11 +470,11 @@ router.delete('/:id', checkPermission('fines:delete'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // ============================================
 // ROTAS DE DOCUMENTOS DAS MULTAS
 // ============================================
-
+ 
 // GET /api/fines/:fineId/documents - Listar documentos
 router.get('/:fineId/documents', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -471,7 +495,7 @@ router.get('/:fineId/documents', checkPermission('fines:read'), async (req, res)
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // POST /api/fines/:fineId/documents - Adicionar documento
 router.post('/:fineId/documents', checkPermission('fines:update'), async (req, res) => {
   try {
@@ -510,7 +534,7 @@ router.post('/:fineId/documents', checkPermission('fines:update'), async (req, r
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // DELETE /api/fines/:fineId/documents/:documentId - Deletar documento
 router.delete('/:fineId/documents/:documentId', checkPermission('fines:delete'), async (req, res) => {
   try {
@@ -529,11 +553,11 @@ router.delete('/:fineId/documents/:documentId', checkPermission('fines:delete'),
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
+ 
 // ============================================
 // ROTAS DE LOGS DAS MULTAS
 // ============================================
-
+ 
 // GET /api/fines/:fineId/logs - Listar logs da multa
 router.get('/:fineId/logs', checkPermission('fines:read'), async (req, res) => {
   try {
@@ -547,22 +571,5 @@ router.get('/:fineId/logs', checkPermission('fines:read'), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
-// GET /api/fines/logs/all - Listar todos os logs
-router.get('/logs/all', checkPermission('fines:read'), async (req, res) => {
-  try {
-    const tenantId = req.tenantId;
-    const { limit, offset } = req.query;
-    
-    const logs = await fineLogModel.getAllLogs(tenantId, parseInt(limit) || 100, parseInt(offset) || 0);
-    const total = await fineLogModel.countLogs(tenantId);
-    
-    res.json({ success: true, data: logs, total });
-  } catch (err) {
-    console.error('Erro ao buscar logs:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
+ 
 module.exports = router;
-
