@@ -4,6 +4,10 @@ const pool = require('../config/db');
 // CLIENTS MODEL - Clientes/Proprietários
 // ============================================
 
+// Helper - converte string vazia para null (evita erro de tipo date no PostgreSQL)
+const toDateOrNull = (value) => (value === '' || value === undefined ? null : value);
+const toStrOrNull = (value) => (value === '' || value === undefined ? null : value);
+
 // CREATE - Criar novo cliente
 const createClient = async ({ 
   tenant_id, name, birth_date, cpf, cnh, first_cnh, phone, email, address, notes 
@@ -15,7 +19,18 @@ const createClient = async ({
   const result = await pool.query(
     `INSERT INTO clients(tenant_id, name, birth_date, cpf, cnh, first_cnh, phone, email, address, notes) 
      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-    [tenant_id, name, birth_date, cpf, cnh, first_cnh, phone, email, address, notes]
+    [
+      tenant_id,
+      name,
+      toDateOrNull(birth_date),
+      toStrOrNull(cpf),
+      toStrOrNull(cnh),
+      toDateOrNull(first_cnh),
+      toStrOrNull(phone),
+      toStrOrNull(email),
+      toStrOrNull(address),
+      toStrOrNull(notes)
+    ]
   );
   
   return result.rows[0];
@@ -76,7 +91,19 @@ const updateClient = async (id, { name, birth_date, cpf, cnh, first_cnh, phone, 
     `UPDATE clients 
      SET name = $1, birth_date = $2, cpf = $3, cnh = $4, first_cnh = $5, phone = $6, email = $7, address = $8, notes = $9, updated_at = NOW()
      WHERE id = $10 AND tenant_id = $11 RETURNING *`,
-    [name, birth_date, cpf, cnh, first_cnh, phone, email, address, notes, id, tenant_id]
+    [
+      name,
+      toDateOrNull(birth_date),
+      toStrOrNull(cpf),
+      toStrOrNull(cnh),
+      toDateOrNull(first_cnh),
+      toStrOrNull(phone),
+      toStrOrNull(email),
+      toStrOrNull(address),
+      toStrOrNull(notes),
+      id,
+      tenant_id
+    ]
   );
   return result.rows[0];
 };
@@ -100,4 +127,3 @@ module.exports = {
   updateClient,
   deleteClient
 };
-
