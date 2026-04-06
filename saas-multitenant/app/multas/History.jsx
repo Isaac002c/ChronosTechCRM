@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import { getAllFineLogs, getFineLogs, FINE_STATUS_LABELS, FINE_STAGE_LABELS } from '../lib/finesAPI';
 
 const ACTION_LABELS = {
-  created: 'CriaÃ§Ã£o',
+  created: 'Criação',
   status_changed: 'Status alterado',
-  stage_changed: 'EstÃ¡gio alterado',
+  stage_changed: 'Estágio alterado',
   document_added: 'Documento adicionado',
-  updated: 'AtualizaÃ§Ã£o',
-  deleted: 'ExclusÃ£o'
+  updated: 'Atualização',
+  deleted: 'Exclusão'
 };
 
 const ACTION_COLORS = {
@@ -22,12 +22,12 @@ const ACTION_COLORS = {
 };
 
 const ACTION_ICONS = {
-  created: 'âœš',
-  status_changed: 'â†”',
-  stage_changed: 'â†‘',
-  document_added: 'ðŸ“„',
-  updated: 'âœŽ',
-  deleted: 'âœ•'
+  created: '✓',
+  status_changed: '↔',
+  stage_changed: '↑',
+  document_added: '📄',
+  updated: '✎',
+  deleted: '✕'
 };
 
 const PAGE_SIZE = 20;
@@ -52,7 +52,6 @@ export default function MultasHistory() {
       setError(null);
       const offset = (page - 1) * PAGE_SIZE;
       const data = await getAllFineLogs(PAGE_SIZE, offset);
-      // getAllFineLogs retorna { data: [...], total } ou array direto
       if (Array.isArray(data)) {
         setLogs(data);
         setTotal(data.length);
@@ -61,7 +60,7 @@ export default function MultasHistory() {
         setTotal(data?.total || 0);
       }
     } catch (err) {
-      console.error('Erro ao carregar histÃ³rico:', err);
+      console.error('Erro ao carregar histórico:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -87,7 +86,6 @@ export default function MultasHistory() {
     });
   };
 
-  // Filtro local por aÃ§Ã£o e dias (jÃ¡ que o endpoint nÃ£o filtra)
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - parseInt(filters.days || 30));
 
@@ -105,7 +103,7 @@ export default function MultasHistory() {
       const newLabel = FINE_STATUS_LABELS[log.new_value] || FINE_STAGE_LABELS[log.new_value] || log.new_value;
       return (
         <span style={{ fontSize: 12, color: '#6b7280' }}>
-          {oldLabel} â†’ <strong style={{ color: '#111' }}>{newLabel}</strong>
+          {oldLabel} → <strong style={{ color: '#111' }}>{newLabel}</strong>
         </span>
       );
     }
@@ -119,7 +117,7 @@ export default function MultasHistory() {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Carregando histÃ³rico...</p>
+        <p>Carregando histórico...</p>
       </div>
     );
   }
@@ -130,7 +128,7 @@ export default function MultasHistory() {
       {/* Filtros */}
       <div className="filters-section">
         <div className="filter-group">
-          <label>AÃ§Ã£o</label>
+          <label>Ação</label>
           <select value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })}>
             <option value="">Todas</option>
             {Object.entries(ACTION_LABELS).map(([val, label]) => (
@@ -139,12 +137,12 @@ export default function MultasHistory() {
           </select>
         </div>
         <div className="filter-group">
-          <label>PerÃ­odo</label>
+          <label>Período</label>
           <select value={filters.days} onChange={(e) => setFilters({ ...filters, days: e.target.value })}>
-            <option value="7">Ãšltimos 7 dias</option>
-            <option value="30">Ãšltimos 30 dias</option>
-            <option value="90">Ãšltimos 90 dias</option>
-            <option value="365">Ãšltimo ano</option>
+            <option value="7">Últimos 7 dias</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+            <option value="365">Último ano</option>
           </select>
         </div>
         <button onClick={applyFilters} className="btn-filter">Filtrar</button>
@@ -155,7 +153,7 @@ export default function MultasHistory() {
       {error && (
         <div className="error-message">
           <p>{error}</p>
-          <button onClick={() => setError(null)}>âœ•</button>
+          <button onClick={() => setError(null)}>✕</button>
         </div>
       )}
 
@@ -168,7 +166,7 @@ export default function MultasHistory() {
       <div className="activity-list">
         {filteredLogs.length === 0 ? (
           <div className="empty-state">
-            <p>Nenhuma atividade registrada no perÃ­odo</p>
+            <p>Nenhuma atividade registrada no período</p>
           </div>
         ) : (
           filteredLogs.map((log) => (
@@ -183,7 +181,7 @@ export default function MultasHistory() {
                   fontSize: 16
                 }}
               >
-                {ACTION_ICONS[log.action] || 'Â·'}
+                {ACTION_ICONS[log.action] || '·'}
               </div>
               <div className="activity-content" style={{ flex: 1 }}>
                 <div className="activity-header" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -191,15 +189,15 @@ export default function MultasHistory() {
                     {ACTION_LABELS[log.action] || log.action}
                   </span>
                   {log.field_name && log.field_name !== 'fine' && (
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>â€¢ {log.field_name}</span>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>• {log.field_name}</span>
                   )}
                 </div>
                 <div style={{ marginTop: 2 }}>
                   {renderChangeDetail(log)}
                 </div>
                 <div className="activity-meta" style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 12, color: '#9ca3af' }}>
-                  <span>ðŸ‘¤ {log.user_name || log.user_email || 'Sistema'}</span>
-                  <span>ðŸ• {formatDate(log.created_at)}</span>
+                  <span>👤 {log.user_name || log.user_email || 'Sistema'}</span>
+                  <span>🕐 {formatDate(log.created_at)}</span>
                   {log.fine_id && (
                     <span style={{ fontFamily: 'monospace' }}>#{log.fine_id.substring(0, 8)}</span>
                   )}
@@ -210,15 +208,15 @@ export default function MultasHistory() {
         )}
       </div>
 
-      {/* PaginaÃ§Ã£o */}
+      {/* Paginação */}
       {totalPages > 1 && (
         <div className="pagination" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 24, justifyContent: 'center' }}>
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-pagination">
-            â† Anterior
+            ← Anterior
           </button>
-          <span className="page-info">PÃ¡gina {page} de {totalPages}</span>
+          <span className="page-info">Página {page} de {totalPages}</span>
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-pagination">
-            PrÃ³xima â†’
+            Próxima →
           </button>
         </div>
       )}

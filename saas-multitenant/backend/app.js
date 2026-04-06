@@ -29,6 +29,7 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const saasRoutes = require('./routes/saasRoutes');
 const userManagementRoutes = require('./routes/userManagementRoutes');
 const finesRoutes = require('./routes/finesRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -102,6 +103,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api', saasRoutes);
 app.use('/api/fines', finesRoutes);
 app.use('/api/users/management', userManagementRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // ============================================
 // 404
