@@ -1,4 +1,4 @@
-// File: /home/zac/estudosDev/ChronosTechCRM/saas-multitenant/app/multas/clients/[id]/page.jsx
+// File: /workspaces/ChronosTechCRM/saas-multitenant/app/multas/clients/[id]/page.jsx
 import * as entry from '../../../../../../app/multas/clients/[id]/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

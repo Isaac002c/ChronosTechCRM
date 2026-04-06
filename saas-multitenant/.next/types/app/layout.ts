@@ -1,4 +1,4 @@
-// File: /home/zac/estudosDev/ChronosTechCRM/saas-multitenant/app/layout.jsx
+// File: /workspaces/ChronosTechCRM/saas-multitenant/app/layout.jsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

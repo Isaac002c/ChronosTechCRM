@@ -1,8 +1,8 @@
-// File: /workspaces/ChronosTechCRM/saas-multitenant/app/dashboard/page.jsx
-import * as entry from '../../../../app/dashboard/page.js'
+// File: /workspaces/ChronosTechCRM/saas-multitenant/app/settings/page.jsx
+import * as entry from '../../../../app/settings/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
-type TEntry = typeof import('../../../../app/dashboard/page.js')
+type TEntry = typeof import('../../../../app/settings/page.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{
