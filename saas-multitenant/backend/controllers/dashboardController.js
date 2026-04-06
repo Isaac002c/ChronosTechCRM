@@ -21,9 +21,13 @@ const getAprsStats = async (req, res) => {
       JOIN contracts ct ON ct.service_id = s.id
       WHERE c.tenant_id = $1
         AND ct.status IN (
+        AND UPPER(TRIM(ct.status)) IN (
           'APRS DEFESA PRÉVIA',
           'DEFESA PRÉVIA - ANÁLISE',
           'APRS 1 INSTÂNCIA',
+          'APRS 1ª INSTÂNCIA', -- Cobrindo possível variação
+          'APRS 1 INSTANCIA',
+          'APRS 1 INSTÂNCIA', 
           '1 INSTÂNCIA - ANÁLISE',
           'APRS 2 INSTÂNCIA',
           '2 INSTÂNCIA -ANÁLISE'

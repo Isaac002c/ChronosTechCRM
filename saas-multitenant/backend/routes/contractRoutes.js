@@ -2,10 +2,43 @@ const express = require('express');
 const router = express.Router();
 const contractModel = require('../models/contractModels');
 const { checkPermission } = require('../middlewares/checkPermission');
-const tenantContext = require('../middlewares/tenantContext');
 
-// middleware tenant
-// tenant middleware already in app.js
+// GET /contracts/aprs-stats - Estatísticas de APRs por estágio (ANTES de /:id)
+router.get('/aprs-stats', checkPermission('contracts:read'), async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const stats = await contractModel.getAPRsByStage(tenantId);
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    console.error('Erro ao buscar APRs:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /contracts - Buscar todos os contratos do tenant
+router.get('/', checkPermission('contracts:read'), async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const contracts = await contractModel.getAllContracts(tenantId);
+    res.json({ success: true, data: contracts });
+  } catch (err) {
+    console.error('Erro ao buscar contratos:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /contracts/client/:clientId
+router.get('/client/:clientId', checkPermission('contracts:read'), async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const tenantId = req.tenantId;
+    const contracts = await contractModel.getContractsByClient(clientId, tenantId);
+    res.json({ success: true, data: contracts });
+  } catch (err) {
+    console.error('Erro ao buscar contratos do cliente:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // GET /contracts/service/:serviceId
 router.get('/service/:serviceId', checkPermission('contracts:read'), async (req, res) => {
@@ -62,7 +95,7 @@ router.delete('/:id', checkPermission('contracts:delete'), async (req, res) => {
   }
 });
 
-// GET /contracts/:id
+// GET /contracts/:id (SEMPRE POR ÚLTIMO)
 router.get('/:id', checkPermission('contracts:read'), async (req, res) => {
   try {
     const { id } = req.params;
