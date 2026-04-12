@@ -9,6 +9,7 @@ require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 
 const tenantContext = require('./middlewares/tenantContext');
 const pool = require('./config/db');
@@ -65,6 +66,30 @@ app.use(cors(corsOptions));
 // 🔥 PREFLIGHT CORRETO (USA A MESMA CONFIG)
 app.options('*', cors(corsOptions));
 
+// 🔥 SECURITY HEADERS (OWASP)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'http://localhost:3001', 'https://crm.chronostek.com.br'],
+      frameAncestors: ["'none'"]
+    }
+  },
+  crossFrame: false, // X-Frame-Options: DENY
+  contentTypeOptions: true, // X-Content-Type-Options: nosniff
+  referrerPolicy: 'strict-origin-when-cross-origin'
+}));
+
+// Permissions-Policy: none (API server)
+app.use((req, res, next) => {
+  res.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
+
+
 // ============================================
 // MIDDLEWARES
 // ============================================
@@ -73,10 +98,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Logging middleware (after security headers)
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
+
 
 // ============================================
 // ROTAS

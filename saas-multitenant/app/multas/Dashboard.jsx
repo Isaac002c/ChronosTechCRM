@@ -13,12 +13,12 @@ import { getClients } from '../lib/clientsAPI';
 import { getAprsStats } from '../lib/contractsAPI';
 
 const APR_LABELS = {
-  'APRS DEFESA PRÃ‰VIA':      { label: 'APRS Defesa PrÃ©via',      color: '#6366f1' },
-  'DEFESA PRÃ‰VIA - ANÃLISE': { label: 'Defesa PrÃ©via - AnÃ¡lise', color: '#8b5cf6' },
-  'APRS 1 INSTÃ‚NCIA':        { label: 'APRS 1Âª InstÃ¢ncia',       color: '#f59e0b' },
-  '1 INSTÃ‚NCIA - ANÃLISE':   { label: '1Âª InstÃ¢ncia - AnÃ¡lise',  color: '#f97316' },
-  'APRS 2 INSTÃ‚NCIA':        { label: 'APRS 2Âª InstÃ¢ncia',       color: '#ef4444' },
-  '2 INSTÃ‚NCIA -ANÃLISE':    { label: '2Âª InstÃ¢ncia - AnÃ¡lise',  color: '#dc2626' },
+  'APRS DEFESA PRÉVIA':      { label: 'APRS Defesa Prévia',      color: '#6366f1' },
+  'DEFESA PRÉVIA - ANÁLISE': { label: 'Defesa Prévia - Análise', color: '#8b5cf6' },
+  'APRS 1 INSTÂNCIA':        { label: 'APRS 1ª Instância',       color: '#f59e0b' },
+  '1 INSTÂNCIA - ANÁLISE':   { label: '1ª Instância - Análise',  color: '#f97316' },
+  'APRS 2 INSTÂNCIA':        { label: 'APRS 2ª Instância',       color: '#ef4444' },
+  '2 INSTÂNCIA -ANÁLISE':    { label: '2ª Instância - Análise',  color: '#dc2626' },
 };
 
 export default function MultasDashboard() {
@@ -119,9 +119,9 @@ export default function MultasDashboard() {
         <div className="stat-card clients"><div className="stat-content"><h3>Total de Clientes</h3><p className="stat-value">{stats?.totalClients || 0}</p></div></div>
       </div>
 
-      {/* GrÃ¡fico de APRs */}
+      {/* Gráfico de APRs */}
       <div className="charts-section">
-        <h3 className="section-title">Clientes por EstÃ¡gio APR</h3>
+        <h3 className="section-title">Clientes por Estágio APR</h3>
         {aprStats.length > 0 ? (
           <div className="organ-chart">
             {aprStats.map((stage, index) => (
@@ -138,13 +138,13 @@ export default function MultasDashboard() {
             ))}
           </div>
         ) : (
-          <div className="empty-chart"><p>Nenhum cliente em estÃ¡gio APR no momento</p></div>
+          <div className="empty-chart"><p>Nenhum cliente em estágio APR no momento</p></div>
         )}
       </div>
 
-      {/* GrÃ¡fico por Ã“rgÃ£o */}
+      {/* Gráfico por Órgão */}
       <div className="charts-section">
-        <h3 className="section-title">Multas por Ã“rgÃ£o</h3>
+        <h3 className="section-title">Multas por Órgão</h3>
         {contractsByOrgan.length > 0 ? (
           <div className="organ-chart">
             {contractsByOrgan.map((organ, index) => (
@@ -167,9 +167,9 @@ export default function MultasDashboard() {
 
       {urgentFines.length > 0 && (
         <div className="charts-section">
-          <h3 className="section-title">Multas com Prazo PrÃ³ximo (7 dias)</h3>
+          <h3 className="section-title">Multas com Prazo Próximo (7 dias)</h3>
           <table className="data-table">
-            <thead><tr><th>NÂº Multa</th><th>Cliente</th><th>Placa</th><th>Ã“rgÃ£o</th><th>Vencimento</th><th>Status</th></tr></thead>
+            <thead><tr><th>Nº Multa</th><th>Cliente</th><th>Placa</th><th>Órgão</th><th>Vencimento</th><th>Status</th></tr></thead>
             <tbody>
               {urgentFines.map((fine) => (
                 <tr key={fine.id}>
@@ -188,12 +188,12 @@ export default function MultasDashboard() {
         <div className="modal-overlay" onClick={() => setShowAlertsModal(false)}>
           <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{alertType === 'warning' ? 'Multas PrÃ³ximas ao Vencimento' : alertType === 'danger' ? 'Multas Vencidas' : 'InformaÃ§Ãµes'}</h2>
-              <button onClick={() => setShowAlertsModal(false)} className="btn-close">âœ•</button>
+              <h2>{alertType === 'warning' ? 'Multas Próximas ao Vencimento' : alertType === 'danger' ? 'Multas Vencidas' : 'Informações'}</h2>
+              <button onClick={() => setShowAlertsModal(false)} className="btn-close">✕</button>
             </div>
             <div className="modal-body">
               <table className="data-table">
-                <thead><tr><th>NÂº Multa</th><th>Cliente</th><th>Placa</th><th>Vencimento</th><th>Status</th></tr></thead>
+                <thead><tr><th>Nº Multa</th><th>Cliente</th><th>Placa</th><th>Vencimento</th><th>Status</th></tr></thead>
                 <tbody>
                   {(alertType === 'warning' ? urgentFines : overdueFines).map((fine) => (
                     <tr key={fine.id}>
