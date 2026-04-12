@@ -2,15 +2,15 @@ const express = require('express');
 const router = express.Router();
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const { body, validationResult } = require('express-validator');
 const { createUser } = require('../models/userModels');
 const { createTenant } = require('../models/tenantModels');
 const pool = require('../config/db');
 
-// ✅ Logger seguro (só loga em dev)
 const isDev = process.env.NODE_ENV !== 'production';
 const log = (...args) => { if (isDev) console.log(...args); };
 
-// ✅ JWT_SECRET sem fallback inseguro
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET não definido nas variáveis de ambiente');
@@ -21,138 +21,144 @@ const sendJson = (res, status, data) => {
   res.status(status).setHeader('Content-Type', 'application/json').json(data);
 };
 
-// 1. REGISTER
-router.post('/register', async (req, res) => {
-  try {
-    const { tenantName, name, email, password } = req.body;
+// ✅ Rate limit específico pro login
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-    if (!tenantName || !name || !email || !password) {
-      return sendJson(res, 400, {
-        success: false,
-        message: 'Todos os campos são obrigatórios'
-      });
+// 1. REGISTER
+router.post('/register',
+  [
+    body('tenantName').notEmpty().trim().escape(),
+    body('name').notEmpty().trim().escape(),
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 6 }),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return sendJson(res, 400, { success: false, message: 'Dados inválidos' });
     }
 
-    const tenant = await createTenant(tenantName);
+    try {
+      const { tenantName, name, email, password } = req.body;
 
-    const existingUsers = await pool.query(
-      'SELECT COUNT(*) as count FROM users WHERE tenant_id = $1',
-      [tenant.id]
-    );
-    const isFirstUser = parseInt(existingUsers.rows[0].count) === 0;
+      const tenant = await createTenant(tenantName);
 
-    const user = await createUser({
-      name,
-      email,
-      password,
-      tenant_id: tenant.id,
-      role: isFirstUser ? 'admin' : 'seller'
-    });
+      const existingUsers = await pool.query(
+        'SELECT COUNT(*) as count FROM users WHERE tenant_id = $1',
+        [tenant.id]
+      );
+      const isFirstUser = parseInt(existingUsers.rows[0].count) === 0;
 
-    sendJson(res, 201, {
-      success: true,
-      tenant_id: tenant.id,
-      message: 'Tenant + usuário criado com sucesso!'
-    });
-  } catch (err) {
-    console.error('[REGISTER ERROR]', err.message);
-    sendJson(res, 500, {
-      success: false,
-      message: 'Erro ao registrar tenant e usuário'
-    });
+      await createUser({
+        name,
+        email,
+        password,
+        tenant_id: tenant.id,
+        role: isFirstUser ? 'admin' : 'seller'
+      });
+
+      sendJson(res, 201, {
+        success: true,
+        tenant_id: tenant.id,
+        message: 'Tenant + usuário criado com sucesso!'
+      });
+    } catch (err) {
+      console.error('[REGISTER ERROR]', err.message);
+      sendJson(res, 500, { success: false, message: 'Erro ao registrar' });
+    }
   }
-});
+);
 
 // 2. LOGIN
-router.post('/login', async (req, res) => {
-  let client;
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return sendJson(res, 400, {
-        success: false,
-        message: 'Email e senha obrigatórios'
-      });
+router.post('/login',
+  loginLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 6 }).trim(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return sendJson(res, 400, { success: false, message: 'Dados inválidos' });
     }
 
-    client = await pool.connect();
+    let client;
+    try {
+      const { email, password } = req.body;
 
-    const result = await client.query(
-      `SELECT u.id, u.name, u.email, u.password_hash, u.tenant_id, u.role,
-              t.name as tenant_name
-       FROM users u
-       JOIN tenants t ON u.tenant_id = t.id
-       WHERE u.email = $1`,
-      [email]
-    );
+      client = await pool.connect();
 
-    const user = result.rows[0];
+      const result = await client.query(
+        `SELECT u.id, u.name, u.email, u.password_hash, u.tenant_id, u.role,
+                t.name as tenant_name
+         FROM users u
+         JOIN tenants t ON u.tenant_id = t.id
+         WHERE u.email = $1`,
+        [email]
+      );
 
-    // ✅ Mensagem genérica (não revela se email existe ou não)
-    if (!user) {
-      return sendJson(res, 401, {
-        success: false,
-        message: 'Credenciais inválidas'
-      });
-    }
+      const user = result.rows[0];
 
-    const isValidPassword = await bcryptjs.compare(password, user.password_hash);
-
-    if (!isValidPassword) {
-      return sendJson(res, 401, {
-        success: false,
-        message: 'Credenciais inválidas'
-      });
-    }
-
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        tenantId: user.tenant_id,
-        email: user.email,
-        role: user.role || 'admin'
-      },
-      getJWTSecret(),
-      { expiresIn: '30d' }
-    );
-
-    // ✅ Cookie config segura
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000
-    };
-
-    res.cookie('token', token, cookieOptions);
-    res.cookie('auth-token', token, cookieOptions);
-    res.cookie('tenantId', user.tenant_id.toString(), cookieOptions);
-
-    sendJson(res, 200, {
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role || 'admin'
-      },
-      tenant: {
-        id: user.tenant_id,
-        name: user.tenant_name
+      if (!user) {
+        return sendJson(res, 401, { success: false, message: 'Credenciais inválidas' });
       }
-    });
-  } catch (err) {
-    console.error('[LOGIN ERROR]', err.message);
-    sendJson(res, 500, {
-      success: false,
-      message: 'Erro no servidor'
-    });
-  } finally {
-    if (client) client.release();
+
+      const isValidPassword = await bcryptjs.compare(password, user.password_hash);
+
+      if (!isValidPassword) {
+        return sendJson(res, 401, { success: false, message: 'Credenciais inválidas' });
+      }
+
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          tenantId: user.tenant_id,
+          email: user.email,
+          role: user.role || 'admin'
+        },
+        getJWTSecret(),
+        { expiresIn: '30d' }
+      );
+
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000
+      };
+
+      res.cookie('token', token, cookieOptions);
+      res.cookie('auth-token', token, cookieOptions);
+      res.cookie('tenantId', user.tenant_id.toString(), cookieOptions);
+
+      sendJson(res, 200, {
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role || 'admin'
+        },
+        tenant: {
+          id: user.tenant_id,
+          name: user.tenant_name
+        }
+      });
+    } catch (err) {
+      console.error('[LOGIN ERROR]', err.message);
+      sendJson(res, 500, { success: false, message: 'Erro no servidor' });
+    } finally {
+      if (client) client.release();
+    }
   }
-});
+);
 
 // 3. VALIDATE TOKEN
 router.post('/validate', async (req, res) => {

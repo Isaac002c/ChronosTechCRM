@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // Proxy para o backend Express (mantido)
   async rewrites() {
     return [
       {
@@ -12,7 +11,6 @@ const nextConfig = {
     ];
   },
 
-  //  Headers de segurança
   async headers() {
     return [
       {
@@ -30,7 +28,8 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self'",
-              "connect-src 'self' https://crm.chronostek.com.br",
+              //Render
+              "connect-src 'self' https://crm.chronostek.com.br https://chronostechcrm.onrender.com",
               "frame-ancestors 'none'",
               "object-src 'none'",
             ].join('; '),
