@@ -1,493 +1,222 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { getClientById } from '../../../lib/clientsAPI';
-import { getServicesByClient, createService, deleteService } from '../../../lib/servicesAPI';
-import { getContractsByService, createContract, updateContract, deleteContract } from '../../../lib/contractsAPI';
+import { useRouter } from 'next/navigation';
+import { getClients, createClient, updateClient, deleteClient, searchClients } from '../lib/clientsAPI';
 
-// Constantes para dropdowns
-const SERVICE_TYPES = ['CRCI', 'MULTA', 'SUSPENSÃO', 'CASSAÇÃO', 'REVISÃO DE ATOS', 'PROCESSO'];
-const MULTA_STATUSES = [
-  'APRS DEFESA PRÉVIA',
-  'DEFESA PRÉVIA - ANÁLISE',
-  'APRS 1 INSTÂNCIA',
-  '1 INSTÂNCIA - ANÁLISE',
-  'APRS 2 INSTÂNCIA',
-  '2 INSTÂNCIA -ANÁLISE'
-];
-const PROCESSO_TIPOS = ['DETTRAN', 'DER', 'DNIT', 'SMTR', 'RENAINF', 'PMRJ', 'PREFEITURA UF'];
+// Converte ISO date do banco para formato YYYY-MM-DD do input date
+const toInputDate = (value) => {
+  if (!value) return '';
+  return value.substring(0, 10); // "1990-05-20T03:00:00.000Z" â†’ "1990-05-20"
+};
 
-export default function ClientDetail() {
+export default function MultasClients() {
   const router = useRouter();
-  const params = useParams();
-  const [client, setClient] = useState(null);
-  const [services, setServices] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
-  // Modais
-  const [showServiceModal, setShowServiceModal] = useState(false);
-  const [showContractModal, setShowContractModal] = useState(false);
-  const [selectedService, setSelectedService] = useState(null);
-  const [contracts, setContracts] = useState([]);
-  const [loadingContracts, setLoadingContracts] = useState(false);
-  
-  // Edit state
-  const [editingContract, setEditingContract] = useState(null);
-  
-  // Formulário de Serviço
-  const [selectedServiceType, setSelectedServiceType] = useState('');
-  
-  // Formulário de Contrato
-  const [contractForm, setContractForm] = useState({
-    numero_multa: '',
-    vehicle_plate: '',
-    process_number: '',
-    organ: '',
-    status: ''
+  const [formData, setFormData] = useState({
+    name: '', birth_date: '', cpf: '', cnh: '',
+    first_cnh: '', phone: '', email: '', address: '', notes: ''
   });
-  const [isEditing, setIsEditing] = useState(false);
 
-  const clientId = params?.id;
+  useEffect(() => { loadClients(); }, []);
 
-  useEffect(() => {
-    if (clientId) {
-      loadClientData();
-    }
-  }, [clientId]);
-
-  const loadClientData = async () => {
+  const loadClients = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const clientData = await getClientById(clientId);
-      setClient(clientData);
-      
-      const servicesData = await getServicesByClient(clientId);
-      setServices(servicesData);
+      const data = await getClients();
+      setClients(data);
     } catch (err) {
-      console.error('Erro ao carregar dados:', err);
-      setError(err.message || 'Erro ao carregar cliente');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadContracts = async (serviceId) => {
-    try {
-      setLoadingContracts(true);
-      setError(null);
-      const contractsData = await getContractsByService(serviceId);
-      setContracts(contractsData || []);
-    } catch (err) {
-      console.error('Erro ao carregar contratos:', err);
-      setError(err.message);
-      setContracts([]);
-    } finally {
-      setLoadingContracts(false);
+  const handleSearch = async (e) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    if (term.length >= 2) {
+      try { setClients(await searchClients(term)); } catch {}
+    } else if (term.length === 0) {
+      loadClients();
     }
   };
 
-  const handleCreateService = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedServiceType) {
-      setError('Selecione um tipo de serviço');
-      return;
-    }
     try {
-      await createService({
-        client_id: clientId,
-        name: selectedServiceType
-      });
-      setShowServiceModal(false);
-      setSelectedServiceType('');
-      loadClientData();
-    } catch (err) {
-      console.error('Erro ao criar serviço:', err);
-      setError(err.message);
-    }
-  };
-
-  const handleDeleteService = async (serviceId) => {
-    if (!confirm('Tem certeza que deseja excluir este serviço e todos os seus contratos?')) return;
-    try {
-      await deleteService(serviceId);
-      if (selectedService?.id === serviceId) {
-        setSelectedService(null);
-        setContracts([]);
-      }
-      loadClientData();
-    } catch (err) {
-      console.error('Erro ao deletar serviço:', err);
-      setError(err.message);
-    }
-  };
-
-  const handleSelectService = async (service) => {
-    setSelectedService(service);
-    if (service.id) {
-      await loadContracts(service.id);
-    }
-  };
-
-  const resetContractForm = () => {
-    setContractForm({
-      numero_multa: '',
-      vehicle_plate: '',
-      process_number: '',
-      organ: '',
-      status: ''
-    });
-  };
-
-  const openContractModal = (contract = null) => {
-    setIsEditing(!!contract);
-    if (contract) {
-      setContractForm({
-        numero_multa: contract.numero_multa || '',
-        vehicle_plate: contract.vehicle_plate || '',
-        process_number: contract.process_number || '',
-        organ: contract.organ || '',
-        status: contract.status || ''
-      });
-      setEditingContract(contract);
-    } else {
-      resetContractForm();
-      setEditingContract(null);
-    }
-    setShowContractModal(true);
-  };
-
-  const handleSaveContract = async (e) => {
-    e.preventDefault();
-    if (!selectedService) {
-      setError('Selecione um serviço primeiro');
-      return;
-    }
-
-    const serviceName = selectedService.name?.toLowerCase() || '';
-    let payload = {
-      service_id: selectedService.id,
-      organ: selectedService.name === 'processo' ? contractForm.organ : contractForm.organ || 'DETRAN'
-    };
-
-    // Campos condicionais
-    if (serviceName === 'multa') {
-      if (!contractForm.numero_multa || !contractForm.status) {
-        setError('Preencha N da Multa e Status');
-        return;
-      }
-      payload.numero_multa = contractForm.numero_multa;
-      payload.vehicle_plate = contractForm.vehicle_plate;
-      payload.status = contractForm.status;
-    } else if (serviceName === 'processo') {
-      if (!contractForm.process_number || !contractForm.organ || !contractForm.status) {
-        setError('Preencha N do Processo, Tipo e Status');
-        return;
-      }
-      payload.process_number = contractForm.process_number;
-      payload.status = contractForm.status;
-    } else {
-      if (!contractForm.status) {
-        setError('Preencha o Status');
-        return;
-      }
-      payload.status = contractForm.status;
-    }
-
-    try {
-      if (isEditing && editingContract) {
-        await updateContract(editingContract.id, payload);
+      if (editingClient) {
+        await updateClient(editingClient.id, formData);
       } else {
-        await createContract({ ...payload, client_id: clientId });
+        await createClient(formData);
       }
-      setShowContractModal(false);
-      loadContracts(selectedService.id);
+      setShowModal(false);
+      setEditingClient(null);
+      resetForm();
+      loadClients();
     } catch (err) {
-      console.error('Erro ao salvar contrato:', err);
       setError(err.message);
     }
   };
 
-  const handleDeleteContract = async (contractId) => {
-    if (!confirm('Tem certeza que deseja excluir este contrato?')) return;
-    try {
-      await deleteContract(contractId);
-      loadContracts(selectedService.id);
-    } catch (err) {
-      console.error('Erro ao deletar contrato:', err);
-      setError(err.message);
+  const handleEdit = (e, client) => {
+    e.stopPropagation();
+    setEditingClient(client);
+    setFormData({
+      name:       client.name       || '',
+      birth_date: toInputDate(client.birth_date),
+      cpf:        client.cpf        || '',
+      cnh:        client.cnh        || '',
+      first_cnh:  toInputDate(client.first_cnh),
+      phone:      client.phone      || '',
+      email:      client.email      || '',
+      address:    client.address    || '',
+      notes:      client.notes      || '',
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation();
+    if (confirm('Tem certeza que deseja excluir este cliente?')) {
+      try { await deleteClient(id); loadClients(); }
+      catch (err) { setError(err.message); }
     }
   };
 
-  const getTableHeaders = () => {
-    if (!selectedService) return [];
-    const name = selectedService.name?.toLowerCase();
-    if (name === 'multa') {
-      return ['Nº Multa', 'Placa', 'Status', 'Data', 'Ações'];
-    } else if (name === 'processo') {
-      return ['N Processo', 'Tipo', 'Status', 'Data', 'Ações'];
-    }
-    return ['Status', 'Data', 'Ações'];
+  const resetForm = () => setFormData({
+    name: '', birth_date: '', cpf: '', cnh: '',
+    first_cnh: '', phone: '', email: '', address: '', notes: ''
+  });
+
+  const openNewClientModal = () => {
+    setEditingClient(null);
+    resetForm();
+    setShowModal(true);
   };
 
-  const formatCPF = (cpf) => cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/g, '$1.$2.$3-$4') : '-';
+  const formatCPF = (cpf) =>
+    cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/g, '$1.$2.$3-$4') : '-';
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Carregando cliente...</p>
-      </div>
-    );
-  }
-
-  if (!client) {
-    return (
-      <div className="error-message">
-        <p>Cliente não encontrado</p>
-        <button onClick={() => router.push('/multas/clients')}>← Voltar aos Clientes</button>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="loading-container">
+      <div className="loading-spinner"></div>
+      <p>Carregando clientes...</p>
+    </div>
+  );
 
   return (
-    <div className="client-detail">
-      {/* Breadcrumb */}
-      <div className="breadcrumb">
-        <button onClick={() => router.back()} className="btn-back">← Voltar</button>
-        <span>/ {client.name}</span>
+    <div className="multas-clients">
+      <div className="actions-bar">
+        <div className="search-box">
+          <input type="text" placeholder="Buscar clientes..." value={searchTerm}
+            onChange={handleSearch} className="search-input" />
+        </div>
+        <button onClick={openNewClientModal} className="btn-primary">+ Novo Cliente</button>
       </div>
 
       {error && (
         <div className="error-message">
           <p>{error}</p>
-          <button onClick={() => setError(null)}>✕</button>
+          <button onClick={() => setError(null)}>âœ•</button>
         </div>
       )}
 
-      {/* Dados do Cliente */}
-      <div className="client-header">
-        <h1>{client.name}</h1>
-        <div className="client-details">
-          <span>CPF: {formatCPF(client.cpf)}</span>
-          <span>CNH: {client.cnh || '-'}</span>
-          <span>Telefone: {client.phone || '-'}</span>
-          <span>Email: {client.email || '-'}</span>
-        </div>
-      </div>
-
-      {/* Serviços */}
-      <div className="services-section">
-        <div className="section-header">
-          <h2>Serviços</h2>
-          <button onClick={() => setShowServiceModal(true)} className="btn-primary">+ Novo Serviço</button>
-        </div>
-        {services.length === 0 ? (
-          <div className="empty-state">Nenhum serviço. Crie um novo!</div>
-        ) : (
-          <div className="services-list">
-            {services.map((service) => (
-              <div 
-                key={service.id} 
-                className={`service-card ${selectedService?.id === service.id ? 'selected' : ''}`}
-                onClick={() => handleSelectService(service)}
-              >
-                <div className="service-info">
-                  <h3>{service.name}</h3>
-                  <small>{new Date(service.created_at).toLocaleDateString('pt-BR')}</small>
-                </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteService(service.id); }}
-                  className="btn-icon danger"
-                  title="Excluir"
-                >🗑️</button>
-              </div>
+      <div className="data-table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>CPF</th><th>CNH</th><th>Telefone</th><th>Email</th><th>AÃ§Ãµes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clients.length === 0 ? (
+              <tr><td colSpan="6" className="empty-state">Nenhum cliente encontrado</td></tr>
+            ) : clients.map((client) => (
+              <tr key={client.id} onClick={() => router.push(`/multas/clients/${client.id}`)} className="clickable-row">
+                <td>{client.name}</td>
+                <td>{formatCPF(client.cpf)}</td>
+                <td>{client.cnh || '-'}</td>
+                <td>{client.phone || '-'}</td>
+                <td>{client.email || '-'}</td>
+                <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={(e) => handleEdit(e, client)} className="btn-icon" title="Editar">âœï¸</button>
+                  <button onClick={(e) => handleDelete(e, client.id)} className="btn-icon danger" title="Excluir">ðŸ—‘ï¸</button>
+                </td>
+              </tr>
             ))}
-          </div>
-        )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Contratos do Serviço Selecionado */}
-      {selectedService && (
-        <div className="contracts-section">
-          <div className="section-header">
-            <h2>{selectedService.name === 'multa' ? 'Multas' : selectedService.name === 'processo' ? 'Processos' : 'Contratos'} - {selectedService.name}</h2>
-            <button onClick={() => openContractModal()} className="btn-primary">+ Novo</button>
-          </div>
-
-          {loadingContracts ? (
-            <div>Carregando...</div>
-          ) : contracts.length === 0 ? (
-            <div className="empty-state">Nenhum contrato. Adicione um novo!</div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>{getTableHeaders().map(h => <th key={h}>{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {contracts.map((contract) => {
-                  const name = selectedService.name?.toLowerCase();
-                  return (
-                    <tr key={contract.id}>
-                      {name === 'multa' ? (
-                        <>
-                          <td>{contract.numero_multa || '-'}</td>
-                          <td>{contract.vehicle_plate || '-'}</td>
-                          <td>{contract.status || '-'}</td>
-                        </>
-                      ) : name === 'processo' ? (
-                        <>
-                          <td>{contract.process_number || '-'}</td>
-                          <td>{contract.organ || '-'}</td>
-                          <td>{contract.status || '-'}</td>
-                        </>
-                      ) : (
-                        <td>{contract.status || '-'}</td>
-                      )}
-                      <td>{new Date(contract.created_at).toLocaleDateString('pt-BR')}</td>
-                      <td>
-                        <button 
-                          onClick={() => openContractModal(contract)}
-                          className="btn-icon"
-                          title="Editar"
-                        >✏️</button>
-                        <button 
-                          onClick={() => handleDeleteContract(contract.id)}
-                          className="btn-icon danger"
-                          title="Excluir"
-                        >🗑️</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-
-      {/* Modal Novo Serviço - Dropdown */}
-      {showServiceModal && (
-        <div className="modal-overlay" onClick={() => setShowServiceModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Novo Serviço</h2>
-              <button onClick={() => setShowServiceModal(false)} className="btn-close">✕</button>
+              <h2>{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h2>
+              <button onClick={() => setShowModal(false)} className="btn-close">âœ•</button>
             </div>
-            <form onSubmit={handleCreateService}>
+            <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-group">
-                <label>Tipo de Serviço *</label>
-                <select
-                  value={selectedServiceType}
-                  onChange={(e) => setSelectedServiceType(e.target.value)}
-                  required
-                >
-                  <option value="">Selecione...</option>
-                  {SERVICE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                </select>
+                <label>Nome *</label>
+                <input type="text" value={formData.name} required
+                  onChange={(e) => setFormData({...formData, name: e.target.value})} />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Data de Nascimento</label>
+                  <input type="date" value={formData.birth_date}
+                    onChange={(e) => setFormData({...formData, birth_date: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>CPF</label>
+                  <input type="text" value={formData.cpf} maxLength={14}
+                    onChange={(e) => setFormData({...formData, cpf: e.target.value})} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>CNH</label>
+                  <input type="text" value={formData.cnh}
+                    onChange={(e) => setFormData({...formData, cnh: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Primeira CNH</label>
+                  <input type="date" value={formData.first_cnh}
+                    onChange={(e) => setFormData({...formData, first_cnh: e.target.value})} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Telefone</label>
+                  <input type="text" value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input type="email" value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>EndereÃ§o</label>
+                <input type="text" value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>ObservaÃ§Ãµes</label>
+                <textarea value={formData.notes} rows={3}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})} />
               </div>
               <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowServiceModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={!selectedServiceType}>Criar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Novo Contrato - Condicional */}
-      {showContractModal && selectedService && (
-        <div className="modal-overlay" onClick={() => setShowContractModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-<h2>{isEditing ? 'Editar' : 'Novo'} {selectedService.name === 'multa' ? 'Multa' : selectedService.name === 'processo' ? 'Processo' : 'Contrato'} - {selectedService.name}</h2>
-              <button onClick={() => setShowContractModal(false)} className="btn-close">✏️</button>
-            </div>
-            <form onSubmit={handleSaveContract}>
-              {(() => {
-                const name = selectedService.name?.toLowerCase();
-                if (name === 'multa') {
-                  return (
-                    <>
-                      <div className="form-group">
-                        <label>N da Multa *</label>
-                        <input
-                          value={contractForm.numero_multa}
-                          onChange={(e) => setContractForm({...contractForm, numero_multa: e.target.value})}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Placa</label>
-                        <input
-                          value={contractForm.vehicle_plate}
-                          onChange={(e) => setContractForm({...contractForm, vehicle_plate: e.target.value})}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Status *</label>
-                        <select
-                          value={contractForm.status}
-                          onChange={(e) => setContractForm({...contractForm, status: e.target.value})}
-                          required
-                        >
-                          <option value="">Selecione...</option>
-                          {MULTA_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                    </>
-                  );
-                } else if (name === 'processo') {
-                  return (
-                    <>
-                      <div className="form-group">
-                        <label>N do Processo *</label>
-                        <input
-                          value={contractForm.process_number}
-                          onChange={(e) => setContractForm({...contractForm, process_number: e.target.value})}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Tipo *</label>
-                        <select
-                          value={contractForm.organ}
-                          onChange={(e) => setContractForm({...contractForm, organ: e.target.value})}
-                          required
-                        >
-                          <option value="">Selecione...</option>
-                          {PROCESSO_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label>Status *</label>
-                        <input
-                          value={contractForm.status}
-                          onChange={(e) => setContractForm({...contractForm, status: e.target.value})}
-                          required
-                        />
-                      </div>
-                    </>
-                  );
-                } else {
-                  return (
-                    <div className="form-group">
-                      <label>Status *</label>
-                      <input
-                        value={contractForm.status}
-                        onChange={(e) => setContractForm({...contractForm, status: e.target.value})}
-                        required
-                      />
-                    </div>
-                  );
-                }
-              })()}
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setShowContractModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary">Atualizar</button>
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" className="btn-primary">{editingClient ? 'Salvar' : 'Criar'}</button>
               </div>
             </form>
           </div>
