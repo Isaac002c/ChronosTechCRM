@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getClients, createClient, updateClient, deleteClient, searchClients } from '../lib/clientsAPI';
 
-// Converte ISO date do banco para formato YYYY-MM-DD do input date
 const toInputDate = (value) => {
   if (!value) return '';
-  return value.substring(0, 10); // "1990-05-20T03:00:00.000Z" â†’ "1990-05-20"
+  return value.substring(0, 10);
 };
 
 export default function MultasClients() {
@@ -18,7 +17,7 @@ export default function MultasClients() {
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const [formData, setFormData] = useState({
     name: '', birth_date: '', cpf: '', cnh: '',
     first_cnh: '', phone: '', email: '', address: '', notes: ''
@@ -51,18 +50,13 @@ export default function MultasClients() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingClient) {
-        await updateClient(editingClient.id, formData);
-      } else {
-        await createClient(formData);
-      }
+      if (editingClient) { await updateClient(editingClient.id, formData); }
+      else { await createClient(formData); }
       setShowModal(false);
       setEditingClient(null);
       resetForm();
       loadClients();
-    } catch (err) {
-      setError(err.message);
-    }
+    } catch (err) { setError(err.message); }
   };
 
   const handleEdit = (e, client) => {
@@ -122,9 +116,9 @@ export default function MultasClients() {
       </div>
 
       {error && (
-        <div className="error-message">
-          <p>{error}</p>
-          <button onClick={() => setError(null)}>âœ•</button>
+        <div className="error-message" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ margin: 0 }}>{error}</p>
+          <button onClick={() => setError(null)} className="btn-close">x</button>
         </div>
       )}
 
@@ -132,7 +126,7 @@ export default function MultasClients() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Nome</th><th>CPF</th><th>CNH</th><th>Telefone</th><th>Email</th><th>AÃ§Ãµes</th>
+              <th>Nome</th><th>CPF</th><th>CNH</th><th>Telefone</th><th>Email</th><th>Acoes</th>
             </tr>
           </thead>
           <tbody>
@@ -140,14 +134,16 @@ export default function MultasClients() {
               <tr><td colSpan="6" className="empty-state">Nenhum cliente encontrado</td></tr>
             ) : clients.map((client) => (
               <tr key={client.id} onClick={() => router.push(`/multas/clients/${client.id}`)} className="clickable-row">
-                <td>{client.name}</td>
+                <td><strong>{client.name}</strong></td>
                 <td>{formatCPF(client.cpf)}</td>
                 <td>{client.cnh || '-'}</td>
                 <td>{client.phone || '-'}</td>
                 <td>{client.email || '-'}</td>
-                <td className="actions-cell" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={(e) => handleEdit(e, client)} className="btn-icon" title="Editar">âœï¸</button>
-                  <button onClick={(e) => handleDelete(e, client.id)} className="btn-icon danger" title="Excluir">ðŸ—‘ï¸</button>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <div className="actions-cell">
+                    <button onClick={(e) => handleEdit(e, client)} className="btn-icon" title="Editar">&#9999;</button>
+                    <button onClick={(e) => handleDelete(e, client.id)} className="btn-icon danger" title="Excluir">&#128465;</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -160,7 +156,7 @@ export default function MultasClients() {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h2>
-              <button onClick={() => setShowModal(false)} className="btn-close">âœ•</button>
+              <button onClick={() => setShowModal(false)} className="btn-close">x</button>
             </div>
             <form onSubmit={handleSubmit} className="modal-form">
               <div className="form-group">
@@ -205,12 +201,12 @@ export default function MultasClients() {
                 </div>
               </div>
               <div className="form-group">
-                <label>EndereÃ§o</label>
+                <label>Endereco</label>
                 <input type="text" value={formData.address}
                   onChange={(e) => setFormData({...formData, address: e.target.value})} />
               </div>
               <div className="form-group">
-                <label>ObservaÃ§Ãµes</label>
+                <label>Observacoes</label>
                 <textarea value={formData.notes} rows={3}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})} />
               </div>

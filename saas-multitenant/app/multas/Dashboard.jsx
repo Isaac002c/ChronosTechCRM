@@ -5,12 +5,12 @@ import { getAprsStats, getContractsByOrgan, getContractDashboard } from '../lib/
 import { getClients } from '../lib/clientsAPI';
 
 const APR_LABELS = {
-  'APRS DEFESA PRÃ‰VIA':      { label: 'APRS Defesa PrÃ©via',      color: '#6366f1' },
-  'DEFESA PRÃ‰VIA - ANÃLISE': { label: 'Defesa PrÃ©via - AnÃ¡lise', color: '#8b5cf6' },
-  'APRS 1 INSTÃ‚NCIA':        { label: 'APRS 1Âª InstÃ¢ncia',       color: '#f59e0b' },
-  '1 INSTÃ‚NCIA - ANÃLISE':   { label: '1Âª InstÃ¢ncia - AnÃ¡lise',  color: '#f97316' },
-  'APRS 2 INSTÃ‚NCIA':        { label: 'APRS 2Âª InstÃ¢ncia',       color: '#ef4444' },
-  '2 INSTÃ‚NCIA -ANÃLISE':    { label: '2Âª InstÃ¢ncia - AnÃ¡lise',  color: '#dc2626' },
+  'APRS DEFESA PREVIA':      { label: 'APRS Defesa Previa',      color: '#6366f1' },
+  'DEFESA PREVIA - ANALISE': { label: 'Defesa Previa - Analise', color: '#8b5cf6' },
+  'APRS 1 INSTANCIA':        { label: 'APRS 1a Instancia',       color: '#f59e0b' },
+  '1 INSTANCIA - ANALISE':   { label: '1a Instancia - Analise',  color: '#f97316' },
+  'APRS 2 INSTANCIA':        { label: 'APRS 2a Instancia',       color: '#ef4444' },
+  '2 INSTANCIA - ANALISE':   { label: '2a Instancia - Analise',  color: '#dc2626' },
 };
 
 export default function MultasDashboard() {
@@ -58,14 +58,14 @@ export default function MultasDashboard() {
     <div className="multas-dashboard">
 
       <div className="dashboard-grid">
-        <div className="stat-card"><div className="stat-content"><h3>Total de Contratos</h3><p className="stat-value">{stats?.total}</p></div></div>
-        <div className="stat-card active"><div className="stat-content"><h3>Ativos</h3><p className="stat-value">{stats?.ativos}</p></div></div>
-        <div className="stat-card completed"><div className="stat-content"><h3>ConcluÃ­dos</h3><p className="stat-value">{stats?.concluidos}</p></div></div>
-        <div className="stat-card clients"><div className="stat-content"><h3>Clientes</h3><p className="stat-value">{stats?.clientes}</p></div></div>
+        <div className="stat-card"><div className="stat-content"><h3>TOTAL DE CONTRATOS</h3><p className="stat-value">{stats?.total}</p></div></div>
+        <div className="stat-card active"><div className="stat-content"><h3>ATIVOS</h3><p className="stat-value">{stats?.ativos}</p></div></div>
+        <div className="stat-card completed"><div className="stat-content"><h3>CONCLUIDOS</h3><p className="stat-value">{stats?.concluidos}</p></div></div>
+        <div className="stat-card clients"><div className="stat-content"><h3>CLIENTES</h3><p className="stat-value">{stats?.clientes}</p></div></div>
       </div>
 
       <div className="charts-section">
-        <h3 className="section-title">Clientes por EstÃ¡gio APR</h3>
+        <h3 className="section-title">Clientes por Estagio APR</h3>
         {aprStats.length > 0 ? (
           <div className="organ-chart">
             {aprStats.map((s, i) => (
@@ -80,11 +80,11 @@ export default function MultasDashboard() {
               </div>
             ))}
           </div>
-        ) : <div className="empty-chart"><p>Nenhum cliente em estÃ¡gio APR</p></div>}
+        ) : <div className="empty-chart"><p>Nenhum cliente em estagio APR</p></div>}
       </div>
 
       <div className="charts-section">
-        <h3 className="section-title">Contratos por Ã“rgÃ£o</h3>
+        <h3 className="section-title">Contratos por Orgao</h3>
         {byOrgan.length > 0 ? (
           <div className="organ-chart">
             {byOrgan.map((o, i) => (
