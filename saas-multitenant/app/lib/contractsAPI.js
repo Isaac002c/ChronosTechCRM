@@ -18,13 +18,12 @@ export const updateContract = async (id, contractData) =>
 export const deleteContract = async (id) =>
   (await apiRequest(`/api/contracts/${id}`, { method: 'DELETE' })).data;
 
-// Estatísticas de APRs por estágio para o Dashboard
 export const getAprsStats = async () =>
   (await apiRequest('/api/contracts/aprs-stats')).data;
 
-// Stubs for compatibility
-export const getContractDashboard = async () => ({});
-export const getContractsByOrgan = async () => ([]);
-export const getContractAlerts = async () => ([]);
-export const getContractsNearDue = async () => ([]);
-export const getOverdueContracts = async () => ([]);
+// Retorna [{ organ, count, active_count }]
+export const getContractsByOrgan = async () =>
+  (await apiRequest('/api/contracts/by-organ')).data;
+
+export const getContractDashboard = async () =>
+  (await apiRequest('/api/contracts/dashboard')).data;
