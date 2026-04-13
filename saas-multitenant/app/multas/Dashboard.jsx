@@ -5,12 +5,12 @@ import { getAprsStats, getContractsByOrgan, getContractDashboard } from '../lib/
 import { getClients } from '../lib/clientsAPI';
 
 const APR_LABELS = {
-  'APRS DEFESA PREVIA':      { label: 'APRS Defesa Previa',      color: '#6366f1' },
-  'DEFESA PREVIA - ANALISE': { label: 'Defesa Previa - Analise', color: '#8b5cf6' },
-  'APRS 1 INSTANCIA':        { label: 'APRS 1a Instancia',       color: '#f59e0b' },
-  '1 INSTANCIA - ANALISE':   { label: '1a Instancia - Analise',  color: '#f97316' },
-  'APRS 2 INSTANCIA':        { label: 'APRS 2a Instancia',       color: '#ef4444' },
-  '2 INSTANCIA - ANALISE':   { label: '2a Instancia - Analise',  color: '#dc2626' },
+  'APRS DEFESA PREVIA':      { label: 'DEFESA PRÉVIA',           color: '#6366f1' },
+  'DEFESA PREVIA - ANALISE': { label: 'DEFESA PRÉVIA - ANÁLISE', color: '#8b5cf6' },
+  'APRS 1 INSTANCIA':        { label: '1ª INSTÂNCIA',            color: '#f59e0b' },
+  '1 INSTANCIA - ANALISE':   { label: '1ª INSTÂNCIA - ANÁLISE',  color: '#f97316' },
+  'APRS 2 INSTANCIA':        { label: '2ª INSTÂNCIA',            color: '#ef4444' },
+  '2 INSTANCIA - ANALISE':   { label: '2ª INSTÂNCIA - ANÁLISE',  color: '#dc2626' },
 };
 
 export default function MultasDashboard() {
