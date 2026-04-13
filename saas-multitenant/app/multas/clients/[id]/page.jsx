@@ -58,7 +58,6 @@ export default function ClientDetail() {
       ]);
       setClient(clientData);
 
-      // Deduplica servicos por id (caso o backend retorne duplicatas via JOIN)
       const seen = new Set();
       const servicesData = (servicesRaw || []).filter(s => {
         if (seen.has(s.id)) return false;
@@ -346,10 +345,25 @@ export default function ClientDetail() {
                           {PROCESSO_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
-                      <div className="form-group"><label>Andamento *</label><input value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required /></div>
+                      <div className="form-group">
+                        <label>Andamento *</label>
+                        <select value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required>
+                          <option value="">Selecione...</option>
+                          {MULTA_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
                     </>
                   );
-                  return <div className="form-group"><label>Andamento *</label><input value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required /></div>;
+                  // CRCI, SUSPENSAO, CASSACAO, REVISAO DE ATOS â€” todos usam select de status
+                  return (
+                    <div className="form-group">
+                      <label>Andamento *</label>
+                      <select value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required>
+                        <option value="">Selecione...</option>
+                        {MULTA_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  );
                 })()}
                 <div className="form-actions">
                   <button type="button" className="btn-secondary" onClick={() => setShowContractModal(false)}>Cancelar</button>
