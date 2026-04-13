@@ -96,7 +96,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const currentModule = searchParams.get('module') || 'leads';
+  const currentModule = searchParams.get('module') || 'multas';
   const urlTab = searchParams.get('tab') || getDefaultTab(currentModule);
 
   useEffect(() => {

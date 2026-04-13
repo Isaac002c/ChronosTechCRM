@@ -1,82 +1,43 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllFineLogs, getFineLogs, FINE_STATUS_LABELS, FINE_STAGE_LABELS } from '../lib/finesAPI';
+import { getAllContracts } from '../lib/contractsAPI';
 
-const ACTION_LABELS = {
-  created: 'Criação',
-  status_changed: 'Status alterado',
-  stage_changed: 'Estágio alterado',
-  document_added: 'Documento adicionado',
-  updated: 'Atualização',
-  deleted: 'Exclusão'
-};
-
-const ACTION_COLORS = {
-  created: '#22c55e',
-  status_changed: '#3b82f6',
-  stage_changed: '#8b5cf6',
-  document_added: '#f59e0b',
-  updated: '#06b6d4',
-  deleted: '#ef4444'
-};
-
-const ACTION_ICONS = {
-  created: '✓',
-  status_changed: '↔',
-  stage_changed: '↑',
-  document_added: '📄',
-  updated: '✎',
-  deleted: '✕'
+const STATUS_COLORS = {
+  'APRS DEFESA PREVIA':      '#6366f1',
+  'DEFESA PREVIA - ANALISE': '#8b5cf6',
+  'APRS 1 INSTANCIA':        '#f59e0b',
+  '1 INSTANCIA - ANALISE':   '#f97316',
+  'APRS 2 INSTANCIA':        '#ef4444',
+  '2 INSTANCIA - ANALISE':   '#dc2626',
 };
 
 const PAGE_SIZE = 20;
 
 export default function MultasHistory() {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [contracts, setContracts] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [page, setPage]           = useState(1);
+  const [filters, setFilters]     = useState({ status: '', days: '30' });
 
-  // Filtros
-  const [filters, setFilters] = useState({ action: '', days: '30' });
+  useEffect(() => { loadContracts(); }, []);
 
-  useEffect(() => {
-    loadLogs();
-  }, [page]);
-
-  const loadLogs = async () => {
+  const loadContracts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const offset = (page - 1) * PAGE_SIZE;
-      const data = await getAllFineLogs(PAGE_SIZE, offset);
-      if (Array.isArray(data)) {
-        setLogs(data);
-        setTotal(data.length);
-      } else {
-        setLogs(data?.data || data?.logs || []);
-        setTotal(data?.total || 0);
-      }
+      const data = await getAllContracts();
+      setContracts(data || []);
     } catch (err) {
-      console.error('Erro ao carregar histórico:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = () => {
-    setPage(1);
-    loadLogs();
-  };
-
-  const clearFilters = () => {
-    setFilters({ action: '', days: '30' });
-    setPage(1);
-    loadLogs();
-  };
+  const applyFilters = () => { setPage(1); };
+  const clearFilters = () => { setFilters({ status: '', days: '30' }); setPage(1); };
 
   const formatDate = (date) => {
     if (!date) return '-';
@@ -89,38 +50,23 @@ export default function MultasHistory() {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - parseInt(filters.days || 30));
 
-  const filteredLogs = logs.filter(log => {
-    const matchAction = !filters.action || log.action === filters.action;
-    const matchDate = !log.created_at || new Date(log.created_at) >= cutoff;
-    return matchAction && matchDate;
+  const filteredContracts = contracts.filter(c => {
+    const matchStatus = !filters.status || c.status === filters.status;
+    const matchDate   = !c.created_at || new Date(c.created_at) >= cutoff;
+    return matchStatus && matchDate;
   });
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredContracts.length / PAGE_SIZE));
+  const paginated  = filteredContracts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const renderChangeDetail = (log) => {
-    if (log.old_value && log.new_value) {
-      const oldLabel = FINE_STATUS_LABELS[log.old_value] || FINE_STAGE_LABELS[log.old_value] || log.old_value;
-      const newLabel = FINE_STATUS_LABELS[log.new_value] || FINE_STAGE_LABELS[log.new_value] || log.new_value;
-      return (
-        <span style={{ fontSize: 12, color: '#6b7280' }}>
-          {oldLabel} → <strong style={{ color: '#111' }}>{newLabel}</strong>
-        </span>
-      );
-    }
-    if (log.new_value) {
-      return <span style={{ fontSize: 12, color: '#6b7280' }}>{log.new_value}</span>;
-    }
-    return null;
-  };
+  const allStatuses = [...new Set(contracts.map(c => c.status).filter(Boolean))];
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Carregando histórico...</p>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="loading-container">
+      <div className="loading-spinner"></div>
+      <p>Carregando historico...</p>
+    </div>
+  );
 
   return (
     <div className="multas-history">
@@ -128,21 +74,19 @@ export default function MultasHistory() {
       {/* Filtros */}
       <div className="filters-section">
         <div className="filter-group">
-          <label>Ação</label>
-          <select value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })}>
-            <option value="">Todas</option>
-            {Object.entries(ACTION_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>{label}</option>
-            ))}
+          <label>Andamento</label>
+          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+            <option value="">Todos</option>
+            {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="filter-group">
-          <label>Período</label>
+          <label>Periodo</label>
           <select value={filters.days} onChange={(e) => setFilters({ ...filters, days: e.target.value })}>
-            <option value="7">Últimos 7 dias</option>
-            <option value="30">Últimos 30 dias</option>
-            <option value="90">Últimos 90 dias</option>
-            <option value="365">Último ano</option>
+            <option value="7">Ultimos 7 dias</option>
+            <option value="30">Ultimos 30 dias</option>
+            <option value="90">Ultimos 90 dias</option>
+            <option value="365">Ultimo ano</option>
           </select>
         </div>
         <button onClick={applyFilters} className="btn-filter">Filtrar</button>
@@ -153,53 +97,72 @@ export default function MultasHistory() {
       {error && (
         <div className="error-message">
           <p>{error}</p>
-          <button onClick={() => setError(null)}>✕</button>
+          <button onClick={() => setError(null)}>x</button>
         </div>
       )}
 
       {/* Resumo */}
       <div style={{ marginBottom: 16, color: '#6b7280', fontSize: 14 }}>
-        {filteredLogs.length} atividade{filteredLogs.length !== 1 ? 's' : ''} encontrada{filteredLogs.length !== 1 ? 's' : ''}
+        {filteredContracts.length} contrato{filteredContracts.length !== 1 ? 's' : ''} encontrado{filteredContracts.length !== 1 ? 's' : ''}
       </div>
 
-      {/* Lista de atividades */}
+      {/* Lista */}
       <div className="activity-list">
-        {filteredLogs.length === 0 ? (
+        {paginated.length === 0 ? (
           <div className="empty-state">
-            <p>Nenhuma atividade registrada no período</p>
+            <p>Nenhum contrato encontrado no periodo</p>
           </div>
         ) : (
-          filteredLogs.map((log) => (
-            <div key={log.id} className="activity-card">
+          paginated.map((contract) => (
+            <div key={contract.id} className="activity-card">
               <div
                 className="activity-icon"
                 style={{
-                  backgroundColor: `${ACTION_COLORS[log.action] || '#6b7280'}20`,
-                  color: ACTION_COLORS[log.action] || '#6b7280',
+                  backgroundColor: `${STATUS_COLORS[contract.status] || '#6b7280'}20`,
+                  color: STATUS_COLORS[contract.status] || '#6b7280',
                   minWidth: 36, height: 36, borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16
+                  fontSize: 14, fontWeight: 700
                 }}
               >
-                {ACTION_ICONS[log.action] || '·'}
+                {contract.service_name?.[0] || 'C'}
               </div>
               <div className="activity-content" style={{ flex: 1 }}>
                 <div className="activity-header" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 600, color: ACTION_COLORS[log.action] || '#111' }}>
-                    {ACTION_LABELS[log.action] || log.action}
+                  <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                    {contract.client_name || 'Cliente'}
                   </span>
-                  {log.field_name && log.field_name !== 'fine' && (
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>• {log.field_name}</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    â€¢ {contract.service_name || '-'}
+                  </span>
+                  {contract.numero_multa && (
+                    <span style={{ fontSize: 12, color: '#64748b' }}>
+                      â€¢ N {contract.numero_multa}
+                    </span>
+                  )}
+                  {contract.vehicle_plate && (
+                    <span style={{ fontSize: 12, color: '#64748b' }}>
+                      â€¢ {contract.vehicle_plate}
+                    </span>
                   )}
                 </div>
-                <div style={{ marginTop: 2 }}>
-                  {renderChangeDetail(log)}
+                <div style={{ marginTop: 4 }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    background: STATUS_COLORS[contract.status] ? `${STATUS_COLORS[contract.status]}20` : '#f1f5f9',
+                    color: STATUS_COLORS[contract.status] || '#475569',
+                  }}>
+                    {contract.status || '-'}
+                  </span>
                 </div>
                 <div className="activity-meta" style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 12, color: '#9ca3af' }}>
-                  <span>👤 {log.user_name || log.user_email || 'Sistema'}</span>
-                  <span>🕐 {formatDate(log.created_at)}</span>
-                  {log.fine_id && (
-                    <span style={{ fontFamily: 'monospace' }}>#{log.fine_id.substring(0, 8)}</span>
+                  <span>&#128336; {formatDate(contract.created_at)}</span>
+                  {contract.updated_at && contract.updated_at !== contract.created_at && (
+                    <span>Atualizado: {formatDate(contract.updated_at)}</span>
                   )}
                 </div>
               </div>
@@ -208,15 +171,15 @@ export default function MultasHistory() {
         )}
       </div>
 
-      {/* Paginação */}
+      {/* Paginacao */}
       {totalPages > 1 && (
         <div className="pagination" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 24, justifyContent: 'center' }}>
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-pagination">
-            ← Anterior
+            &larr; Anterior
           </button>
-          <span className="page-info">Página {page} de {totalPages}</span>
+          <span className="page-info">Pagina {page} de {totalPages}</span>
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-pagination">
-            Próxima →
+            Proxima &rarr;
           </button>
         </div>
       )}
