@@ -34,10 +34,8 @@ export default function MultasDashboard() {
       ]);
       const d = dashData?.dashboard || dashData || {};
       setStats({
-        total:      parseInt(d.total_contracts)     || 0,
-        ativos:     parseInt(d.active_contracts)    || 0,
-        concluidos: parseInt(d.completed_contracts) || 0,
-        clientes:   clientsData?.length || 0,
+        total:    parseInt(d.total_contracts) || 0,
+        clientes: clientsData?.length || 0,
       });
       setByOrgan(organData || []);
       setAprStats(
@@ -59,13 +57,11 @@ export default function MultasDashboard() {
 
       <div className="dashboard-grid">
         <div className="stat-card"><div className="stat-content"><h3>TOTAL DE CONTRATOS</h3><p className="stat-value">{stats?.total}</p></div></div>
-        <div className="stat-card active"><div className="stat-content"><h3>ATIVOS</h3><p className="stat-value">{stats?.ativos}</p></div></div>
-        <div className="stat-card completed"><div className="stat-content"><h3>CONCLUIDOS</h3><p className="stat-value">{stats?.concluidos}</p></div></div>
         <div className="stat-card clients"><div className="stat-content"><h3>CLIENTES</h3><p className="stat-value">{stats?.clientes}</p></div></div>
       </div>
 
       <div className="charts-section">
-        <h3 className="section-title">Clientes por Estagio APR</h3>
+        <h3 className="section-title">CLIENTES POR ESTÁGIO APR</h3>
         {aprStats.length > 0 ? (
           <div className="organ-chart">
             {aprStats.map((s, i) => (
@@ -84,7 +80,7 @@ export default function MultasDashboard() {
       </div>
 
       <div className="charts-section">
-        <h3 className="section-title">Contratos por Orgao</h3>
+        <h3 className="section-title">CONTRATOS POR ORGÃO</h3>
         {byOrgan.length > 0 ? (
           <div className="organ-chart">
             {byOrgan.map((o, i) => (

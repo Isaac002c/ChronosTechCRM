@@ -52,14 +52,23 @@ export default function ClientDetail() {
     try {
       setLoading(true);
       setError(null);
-      const [clientData, servicesData] = await Promise.all([
+      const [clientData, servicesRaw] = await Promise.all([
         getClientById(clientId),
         getServicesByClient(clientId)
       ]);
       setClient(clientData);
-      setServices(servicesData || []);
+
+      // Deduplica servicos por id (caso o backend retorne duplicatas via JOIN)
+      const seen = new Set();
+      const servicesData = (servicesRaw || []).filter(s => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+      setServices(servicesData);
+
       const entries = await Promise.all(
-        (servicesData || []).map(async (s) => {
+        servicesData.map(async (s) => {
           try { return [s.id, await getContractsByService(s.id) || []]; }
           catch { return [s.id, []]; }
         })
@@ -153,7 +162,6 @@ export default function ClientDetail() {
 
   return (
     <div>
-      {/* Breadcrumb */}
       <div className="breadcrumb">
         <button onClick={() => router.back()} className="btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>
           &larr; Voltar
