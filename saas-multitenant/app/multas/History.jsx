@@ -12,6 +12,9 @@ const STATUS_COLORS = {
   '2 INSTANCIA - ANALISE':   '#dc2626',
 };
 
+const SERVICE_TYPES = ['CRCI', 'MULTA', 'SUSPENSAO', 'CASSACAO', 'REVISAO DE ATOS', 'PROCESSO'];
+const ORGANS = ['DETRAN', 'DER', 'DNIT', 'SMTR', 'RENAINF', 'PMRJ', 'PREFEITURA UF'];
+
 const PAGE_SIZE = 20;
 
 export default function MultasHistory() {
@@ -19,7 +22,7 @@ export default function MultasHistory() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [page, setPage]           = useState(1);
-  const [filters, setFilters]     = useState({ status: '', days: '30' });
+  const [filters, setFilters]     = useState({ status: '', serviceType: '', organ: '', days: '30' });
 
   useEffect(() => { loadContracts(); }, []);
 
@@ -36,8 +39,7 @@ export default function MultasHistory() {
     }
   };
 
-  const applyFilters = () => { setPage(1); };
-  const clearFilters = () => { setFilters({ status: '', days: '30' }); setPage(1); };
+  const clearFilters = () => { setFilters({ status: '', serviceType: '', organ: '', days: '30' }); setPage(1); };
 
   const formatDate = (date) => {
     if (!date) return '-';
@@ -51,9 +53,11 @@ export default function MultasHistory() {
   cutoff.setDate(cutoff.getDate() - parseInt(filters.days || 30));
 
   const filteredContracts = contracts.filter(c => {
-    const matchStatus = !filters.status || c.status === filters.status;
-    const matchDate   = !c.created_at || new Date(c.created_at) >= cutoff;
-    return matchStatus && matchDate;
+    const matchStatus      = !filters.status      || c.status === filters.status;
+    const matchServiceType = !filters.serviceType || (c.service_name || '').toUpperCase() === filters.serviceType.toUpperCase();
+    const matchOrgan       = !filters.organ       || (c.organ || '').toUpperCase() === filters.organ.toUpperCase();
+    const matchDate        = !c.created_at        || new Date(c.created_at) >= cutoff;
+    return matchStatus && matchServiceType && matchOrgan && matchDate;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredContracts.length / PAGE_SIZE));
@@ -75,21 +79,34 @@ export default function MultasHistory() {
       <div className="filters-section">
         <div className="filter-group">
           <label>Andamento</label>
-          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+          <select value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value }); setPage(1); }}>
             <option value="">Todos</option>
             {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="filter-group">
+          <label>Tipo de Servico</label>
+          <select value={filters.serviceType} onChange={(e) => { setFilters({ ...filters, serviceType: e.target.value }); setPage(1); }}>
+            <option value="">Todos</option>
+            {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>Orgao</label>
+          <select value={filters.organ} onChange={(e) => { setFilters({ ...filters, organ: e.target.value }); setPage(1); }}>
+            <option value="">Todos</option>
+            {ORGANS.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <div className="filter-group">
           <label>Periodo</label>
-          <select value={filters.days} onChange={(e) => setFilters({ ...filters, days: e.target.value })}>
+          <select value={filters.days} onChange={(e) => { setFilters({ ...filters, days: e.target.value }); setPage(1); }}>
             <option value="7">Ultimos 7 dias</option>
             <option value="30">Ultimos 30 dias</option>
             <option value="90">Ultimos 90 dias</option>
             <option value="365">Ultimo ano</option>
           </select>
         </div>
-        <button onClick={applyFilters} className="btn-filter">Filtrar</button>
         <button onClick={clearFilters} className="btn-reset">Limpar</button>
       </div>
 
@@ -135,6 +152,11 @@ export default function MultasHistory() {
                   <span style={{ fontSize: 12, color: '#64748b' }}>
                     â€¢ {contract.service_name || '-'}
                   </span>
+                  {contract.organ && (
+                    <span style={{ fontSize: 12, color: '#64748b' }}>
+                      â€¢ {contract.organ}
+                    </span>
+                  )}
                   {contract.numero_multa && (
                     <span style={{ fontSize: 12, color: '#64748b' }}>
                       â€¢ N {contract.numero_multa}
@@ -160,7 +182,7 @@ export default function MultasHistory() {
                   </span>
                 </div>
                 <div className="activity-meta" style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 12, color: '#9ca3af' }}>
-                  <span>&#128336; {formatDate(contract.created_at)}</span>
+                  <span>ðŸ• {formatDate(contract.created_at)}</span>
                   {contract.updated_at && contract.updated_at !== contract.created_at && (
                     <span>Atualizado: {formatDate(contract.updated_at)}</span>
                   )}
@@ -175,11 +197,11 @@ export default function MultasHistory() {
       {totalPages > 1 && (
         <div className="pagination" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 24, justifyContent: 'center' }}>
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-pagination">
-            &larr; Anterior
+            â† Anterior
           </button>
           <span className="page-info">Pagina {page} de {totalPages}</span>
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-pagination">
-            Proxima &rarr;
+            Proxima â†’
           </button>
         </div>
       )}

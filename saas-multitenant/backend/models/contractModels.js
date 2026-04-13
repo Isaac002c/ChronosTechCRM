@@ -145,14 +145,12 @@ const getContractsGroupedByOrgan = async (tenant_id) => {
   return result.rows;
 };
 
-// CORRIGIDO: usa UPPER() para comparar sem depender de acentos
+// Todos os servicos com status de APR — sem filtrar por tipo de servico
 const getAPRsByStage = async (tenant_id) => {
   const result = await pool.query(
     `SELECT c.status, COUNT(*) as count
      FROM contracts c
-     LEFT JOIN services s ON c.service_id = s.id
      WHERE c.tenant_id = $1
-       AND UPPER(s.name) = 'MULTA'
        AND UPPER(c.status) IN (
          'APRS DEFESA PREVIA',
          'DEFESA PREVIA - ANALISE',
