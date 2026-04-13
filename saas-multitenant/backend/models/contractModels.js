@@ -2,14 +2,13 @@ const pool = require('../config/db');
 
 const toDateOrNull = (v) => (v === '' || v == null) ? null : v;
 
-// CREATE
 const createContract = async ({ 
   tenant_id, client_id, service_id, organ, process_number, contract_number,
   infraction_type, vehicle_plate, vehicle_model, status, value, 
-  due_date, notes, numero_multa, deadline_date
+  due_date, notes, numero_multa, deadline_date 
 }) => {
-  if (!tenant_id) throw new Error('tenant_id é obrigatório');
-  if (!client_id) throw new Error('client_id é obrigatório');
+  if (!tenant_id) throw new Error('tenant_id e obrigatorio');
+  if (!client_id) throw new Error('client_id e obrigatorio');
   const result = await pool.query(
     `INSERT INTO contracts(
       tenant_id, client_id, service_id, organ, process_number, contract_number,
@@ -25,7 +24,6 @@ const createContract = async ({
   return result.rows[0];
 };
 
-// READ - todos
 const getAllContracts = async (tenant_id) => {
   const result = await pool.query(
     `SELECT c.*, cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone, s.name as service_name
@@ -38,7 +36,6 @@ const getAllContracts = async (tenant_id) => {
   return result.rows;
 };
 
-// READ - filtros
 const getContractsByFilter = async (tenant_id, filters = {}) => {
   let query = `
     SELECT c.*, cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone, s.name as service_name
@@ -49,16 +46,15 @@ const getContractsByFilter = async (tenant_id, filters = {}) => {
   `;
   const params = [tenant_id];
   let i = 2;
-  if (filters.client_id)     { query += ` AND c.client_id = $${i}`; params.push(filters.client_id); i++; }
-  if (filters.status)        { query += ` AND c.status = $${i}`;    params.push(filters.status); i++; }
-  if (filters.organ)         { query += ` AND c.organ ILIKE $${i}`; params.push(`%${filters.organ}%`); i++; }
-  if (filters.vehicle_plate) { query += ` AND c.vehicle_plate ILIKE $${i}`; params.push(`%${filters.vehicle_plate}%`); i++; }
+  if (filters.client_id)     { query += ` AND c.client_id = $${i}`;           params.push(filters.client_id); i++; }
+  if (filters.status)        { query += ` AND c.status = $${i}`;               params.push(filters.status); i++; }
+  if (filters.organ)         { query += ` AND c.organ ILIKE $${i}`;            params.push(`%${filters.organ}%`); i++; }
+  if (filters.vehicle_plate) { query += ` AND c.vehicle_plate ILIKE $${i}`;   params.push(`%${filters.vehicle_plate}%`); i++; }
   query += ' ORDER BY c.created_at DESC';
   const result = await pool.query(query, params);
   return result.rows;
 };
 
-// READ - por ID
 const getContractById = async (id, tenant_id) => {
   const result = await pool.query(
     `SELECT c.*, cl.name as client_name, cl.cpf as client_cpf, cl.phone as client_phone, cl.email as client_email, s.name as service_name
@@ -71,7 +67,6 @@ const getContractById = async (id, tenant_id) => {
   return result.rows[0];
 };
 
-// READ - por cliente
 const getContractsByClient = async (client_id, tenant_id) => {
   const result = await pool.query(
     `SELECT c.*, s.name as service_name FROM contracts c
@@ -82,7 +77,6 @@ const getContractsByClient = async (client_id, tenant_id) => {
   return result.rows;
 };
 
-// READ - por serviço
 const getContractsByService = async (service_id, tenant_id) => {
   const result = await pool.query(
     `SELECT c.*, s.name as service_name FROM contracts c
@@ -93,7 +87,6 @@ const getContractsByService = async (service_id, tenant_id) => {
   return result.rows;
 };
 
-// READ - por status
 const getContractsByStatus = async (tenant_id) => {
   const result = await pool.query(
     `SELECT status, COUNT(*) as count FROM contracts WHERE tenant_id = $1 GROUP BY status`,
@@ -133,7 +126,6 @@ const getDashboardStats = async (tenant_id) => {
   return result.rows[0];
 };
 
-// READ - por órgão — SOMENTE contratos do serviço PROCESSO
 const getContractsGroupedByOrgan = async (tenant_id) => {
   const result = await pool.query(
     `SELECT 
@@ -153,7 +145,7 @@ const getContractsGroupedByOrgan = async (tenant_id) => {
   return result.rows;
 };
 
-// READ - APRs por estágio
+// CORRIGIDO: usa UPPER() para comparar sem depender de acentos
 const getAPRsByStage = async (tenant_id) => {
   const result = await pool.query(
     `SELECT c.status, COUNT(*) as count
@@ -161,10 +153,13 @@ const getAPRsByStage = async (tenant_id) => {
      LEFT JOIN services s ON c.service_id = s.id
      WHERE c.tenant_id = $1
        AND UPPER(s.name) = 'MULTA'
-       AND c.status IN (
-         'APRS DEFESA PRÉVIA','DEFESA PRÉVIA - ANÁLISE',
-         'APRS 1 INSTÂNCIA','1 INSTÂNCIA - ANÁLISE',
-         'APRS 2 INSTÂNCIA','2 INSTÂNCIA -ANÁLISE'
+       AND UPPER(c.status) IN (
+         'APRS DEFESA PREVIA',
+         'DEFESA PREVIA - ANALISE',
+         'APRS 1 INSTANCIA',
+         '1 INSTANCIA - ANALISE',
+         'APRS 2 INSTANCIA',
+         '2 INSTANCIA - ANALISE'
        )
      GROUP BY c.status ORDER BY c.status`,
     [tenant_id]
@@ -206,14 +201,14 @@ const getAlerts = async (tenant_id) => {
     [tenant_id]
   );
   if (parseInt(nearDue.rows[0].count) > 0)
-    alerts.push({ type: 'warning', title: 'Contratos próximos ao vencimento', message: `${nearDue.rows[0].count} contrato(s) vencem nos próximos 7 dias`, count: parseInt(nearDue.rows[0].count) });
+    alerts.push({ type: 'warning', title: 'Contratos proximos ao vencimento', message: `${nearDue.rows[0].count} contrato(s) vencem nos proximos 7 dias`, count: parseInt(nearDue.rows[0].count) });
 
   const overdue = await pool.query(
     `SELECT COUNT(*) as count FROM contracts WHERE tenant_id=$1 AND status='ativo' AND due_date IS NOT NULL AND due_date < NOW()`,
     [tenant_id]
   );
   if (parseInt(overdue.rows[0].count) > 0)
-    alerts.push({ type: 'danger', title: 'Contratos vencidos', message: `${overdue.rows[0].count} contrato(s) estão vencidos`, count: parseInt(overdue.rows[0].count) });
+    alerts.push({ type: 'danger', title: 'Contratos vencidos', message: `${overdue.rows[0].count} contrato(s) estao vencidos`, count: parseInt(overdue.rows[0].count) });
 
   const stale = await pool.query(
     `SELECT COUNT(*) as count FROM contracts WHERE tenant_id=$1 AND status='ativo'
@@ -221,12 +216,11 @@ const getAlerts = async (tenant_id) => {
     [tenant_id]
   );
   if (parseInt(stale.rows[0].count) > 0)
-    alerts.push({ type: 'info', title: 'Contratos sem atualização', message: `${stale.rows[0].count} contrato(s) sem atualização há mais de 30 dias`, count: parseInt(stale.rows[0].count) });
+    alerts.push({ type: 'info', title: 'Contratos sem atualizacao', message: `${stale.rows[0].count} contrato(s) sem atualizacao ha mais de 30 dias`, count: parseInt(stale.rows[0].count) });
 
   return alerts;
 };
 
-// UPDATE
 const updateContract = async (id, { 
   organ, process_number, contract_number, infraction_type, 
   vehicle_plate, vehicle_model, status, value, due_date, notes,
