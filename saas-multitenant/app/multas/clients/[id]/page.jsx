@@ -8,6 +8,15 @@ import { getContractsByService, createContract, updateContract, deleteContract }
 
 const SERVICE_TYPES = ['CRCI', 'MULTA', 'SUSPENSAO', 'CASSACAO', 'REVISAO DE ATOS', 'PROCESSO'];
 
+const SERVICE_TYPE_IDS = {
+  'CRCI': '1',
+  'MULTA': '2',
+  'SUSPENSAO': '3',
+  'CASSACAO': '4',
+  'REVISAO DE ATOS': '5',
+  'PROCESSO': '6',
+};
+
 const MULTA_STATUSES = [
   'APRS DEFESA PREVIA', 'DEFESA PREVIA - ANALISE',
   'APRS 1 INSTANCIA', '1 INSTANCIA - ANALISE',
@@ -40,13 +49,13 @@ export default function ClientDetail() {
   const params = useParams();
   const clientId = params?.id;
 
-  const [client, setClient]           = useState(null);
-  const [services, setServices]       = useState([]);
+  const [client, setClient]             = useState(null);
+  const [services, setServices]         = useState([]);
   const [contractsMap, setContractsMap] = useState({});
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState(null);
 
-  const [showServiceModal, setShowServiceModal]     = useState(false);
+  const [showServiceModal, setShowServiceModal]       = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState('');
 
   const [showContractModal, setShowContractModal] = useState(false);
@@ -86,11 +95,11 @@ export default function ClientDetail() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // "Novo Serviço" → seleciona tipo → abre direto o modal de adicionar fine
   const handleSelectServiceType = (e) => {
     e.preventDefault();
     if (!selectedServiceType) return;
-    const fakeService = { id: null, name: selectedServiceType };
+    const name = selectedServiceType.toUpperCase();
+    const fakeService = { id: SERVICE_TYPE_IDS[name], name: selectedServiceType };
     setShowServiceModal(false);
     setSelectedServiceType('');
     openContractModal(fakeService);
@@ -134,17 +143,9 @@ export default function ClientDetail() {
       if (!contractForm.status) { setError('Preencha o Andamento'); return; }
     }
 
-    // Busca service_type_id pelo nome se for novo serviço
-    let serviceId = selectedService.id;
-    if (!serviceId) {
-      const { default: api } = await import('../../../lib/api');
-      const st = await api.get(`/service-types/by-code/${name}`);
-      serviceId = st?.id?.toString();
-    }
-
     const payload = {
       client_id:     clientId,
-      service_id:    serviceId,
+      service_id:    selectedService.id,
       numero_multa:  contractForm.numero_multa,
       vehicle_plate: contractForm.vehicle_plate,
       organ:         contractForm.organ || 'DETRAN',
@@ -281,7 +282,7 @@ export default function ClientDetail() {
                       {contracts.map((contract) => (
                         <tr key={contract.id}>
                           {name === 'MULTA'    && <><td>{contract.numero_multa  || '-'}</td><td>{contract.vehicle_plate || '-'}</td></>}
-                          {name === 'PROCESSO' && <><td>{contract.organ         || '-'}</td><td>{contract.organ         || '-'}</td></>}
+                          {name === 'PROCESSO' && <><td>{contract.infraction_type || '-'}</td><td>{contract.organ || '-'}</td></>}
                           {name !== 'MULTA' && name !== 'PROCESSO' && <td>{service.name}</td>}
                           <td>
                             <span className="status-badge" style={{
