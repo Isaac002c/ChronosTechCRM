@@ -57,36 +57,53 @@ export default function ClientDetail() {
     numero_multa: '', vehicle_plate: '', process_number: '', organ: '', status: '',
   });
 
-  // useCallback garante que loadAll nÃ£o muda de referÃªncia a cada render
   const loadAll = useCallback(async () => {
-    if (!clientId) return;
+    console.log('[DEBUG] loadAll iniciado, clientId:', clientId);
+    if (!clientId) {
+      console.log('[DEBUG] clientId vazio, abortando');
+      return;
+    }
     try {
       setLoading(true);
+      console.log('[DEBUG] buscando cliente e servicos...');
       const [clientData, servicesData] = await Promise.all([
         getClientById(clientId),
         getServicesByClient(clientId),
       ]);
+      console.log('[DEBUG] clientData:', JSON.stringify(clientData));
+      console.log('[DEBUG] servicesData:', JSON.stringify(servicesData));
       setClient(clientData);
       const svcs = servicesData || [];
       setServices(svcs);
+      console.log('[DEBUG] servicos setados, quantidade:', svcs.length);
 
       const entries = await Promise.all(
         svcs.map(async (s) => {
-          try { return [s.id, await getContractsByService(s.id) || []]; }
-          catch { return [s.id, []]; }
+          try {
+            const contracts = await getContractsByService(s.id) || [];
+            console.log('[DEBUG] contratos do servico', s.id, ':', contracts.length);
+            return [s.id, contracts];
+          } catch (e) {
+            console.log('[DEBUG] erro ao buscar contratos do servico', s.id, ':', e.message);
+            return [s.id, []];
+          }
         })
       );
       setContractsMap(Object.fromEntries(entries));
+      console.log('[DEBUG] contractsMap setado');
     } catch (err) {
+      console.error('[DEBUG] ERRO NO LOADALL:', err.message, err.stack);
       setError(err.message);
     } finally {
       setLoading(false);
+      console.log('[DEBUG] loading finalizado');
     }
-  }, [clientId]); // sÃ³ recria se clientId mudar
+  }, [clientId]);
 
   useEffect(() => {
+    console.log('[DEBUG] useEffect disparado, clientId:', clientId);
     loadAll();
-  }, [loadAll]); // loadAll Ã© estÃ¡vel graÃ§as ao useCallback
+  }, [loadAll]);
 
   const handleCreateService = async (e) => {
     e.preventDefault();
@@ -181,7 +198,6 @@ export default function ClientDetail() {
 
   return (
     <div>
-      {/* Breadcrumb */}
       <div className="breadcrumb">
         <button onClick={() => router.back()} className="btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>
           &larr; Voltar
@@ -197,7 +213,6 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Dados Pessoais */}
       <div className="client-header">
         <div className="client-info">
           <h1>{client.name}</h1>
@@ -231,7 +246,6 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* Contratacoes */}
       <div className="contracts-section">
         <div className="section-header">
           <h3 style={{ margin: 0 }}>Contratacoes</h3>
@@ -302,7 +316,6 @@ export default function ClientDetail() {
         )}
       </div>
 
-      {/* Modal Novo Servico */}
       {showServiceModal && (
         <div className="modal-overlay" onClick={() => setShowServiceModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -329,7 +342,6 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Modal Contrato */}
       {showContractModal && selectedService && (
         <div className="modal-overlay" onClick={() => setShowContractModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
