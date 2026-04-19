@@ -16,7 +16,7 @@ export const getFineById = async (id) =>
 
 // Buscar multas por cliente
 export const getFinesByClient = async (clientId) =>
-  (await apiRequest(`/api/fines/client/${clientId}`)).data;
+  (await apiRequest(`/api/fines?client_id=${clientId}`)).data;
 
 // Buscar multas por vendedor
 export const getFinesBySeller = async (sellerId) =>
@@ -54,7 +54,7 @@ export const getOverdueFines = async () =>
 export const getFinesByOrgan = async () =>
   (await apiRequest('/api/fines/by-organ')).data;
 
-// Multas por vendedor
+// Multas por vendedor agrupado
 export const getFinesBySellerGrouped = async () =>
   (await apiRequest('/api/fines/by-seller')).data;
 
@@ -141,7 +141,7 @@ export const FINE_STATUS = {
   PROTOCOLADO: 'protocolado',
   DEFERIDO: 'deferido',
   INDEFERIDO: 'indeferido',
-  CANCELADO: 'cancelado'
+  CANCELADO: 'cancelado',
 };
 
 export const FINE_STAGE = {
@@ -149,7 +149,7 @@ export const FINE_STAGE = {
   DEFESA_PREVIA: 'defesa_previa',
   RECURSO_1: 'recurso_1',
   RECURSO_2: 'recurso_2',
-  FINALIZADO: 'finalizado'
+  FINALIZADO: 'finalizado',
 };
 
 export const FINE_STAGE_LABELS = {
@@ -157,7 +157,7 @@ export const FINE_STAGE_LABELS = {
   defesa_previa: 'Defesa Prévia',
   recurso_1: 'Recurso 1ª Instância',
   recurso_2: 'Recurso 2ª Instância',
-  finalizado: 'Finalizado'
+  finalizado: 'Finalizado',
 };
 
 export const FINE_STATUS_LABELS = {
@@ -166,12 +166,12 @@ export const FINE_STATUS_LABELS = {
   protocolado: 'Protocolado',
   deferido: 'Deferido',
   indeferido: 'Indeferido',
-  cancelado: 'Cancelado'
+  cancelado: 'Cancelado',
 };
 
 export const DOCUMENT_CATEGORIES = {
   DEFESA: 'defesa',
   RECURSO: 'recurso',
   COMPROVANTE: 'comprovante',
-  OUTRO: 'outro'
+  OUTRO: 'outro',
 };
