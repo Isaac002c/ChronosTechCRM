@@ -253,6 +253,7 @@ a {
   border: 1px solid #e2e8f0;
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  overflow-y: auto; /* FIX: permite scroll do conteudo interno */
 }
 
 .module-header {
@@ -309,6 +310,7 @@ a {
 /* Module Content */
 .module-content {
   min-height: 400px;
+  overflow-y: visible;
 }
 
 /* ============================================
@@ -588,7 +590,6 @@ h3 {
 
 .kanban-column {
   flex: 0 0 300px;
-  /* min-width: 280px; REMOVIDO - usa flex-shrink: 0 */
   max-width: 320px;
   background: #f8fafc;
   border-radius: 16px;
@@ -2873,7 +2874,6 @@ tr:last-child td {
    MÓDULO DE MULTAS - ESTILOS
    ============================================ */
 
-/* Dashboard de Multas */
 .multas-dashboard {
   padding: 0;
 }
@@ -2984,7 +2984,6 @@ tr:last-child td {
   font-weight: 700;
 }
 
-/* Barra de Ações */
 .actions-bar {
   display: flex;
   justify-content: space-between;
@@ -3013,7 +3012,6 @@ tr:last-child td {
   background: #ffffff;
 }
 
-/* Filtros */
 .filters-section {
   display: flex;
   gap: 16px;
@@ -3059,7 +3057,6 @@ tr:last-child td {
   color: white;
 }
 
-/* Tabela de Dados */
 .data-table-container {
   overflow-x: auto;
 }
@@ -3143,7 +3140,6 @@ tr:last-child td {
   font-weight: 500;
 }
 
-/* Célula de Ações */
 .actions-cell {
   display: flex;
   gap: 8px;
@@ -3171,7 +3167,6 @@ tr:last-child td {
   background: #fef2f2;
 }
 
-/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -3254,7 +3249,6 @@ tr:last-child td {
   padding: 24px;
 }
 
-/* Status Select */
 .status-select {
   padding: 6px 10px;
   border-radius: 6px;
@@ -3284,7 +3278,6 @@ tr:last-child td {
   color: #dc2626;
 }
 
-/* Documents List */
 .documents-list {
   display: flex;
   flex-direction: column;
@@ -3327,7 +3320,6 @@ tr:last-child td {
   background: #2563eb;
 }
 
-/* Estatísticas */
 .stats-row {
   display: flex;
   gap: 24px;
@@ -3355,7 +3347,6 @@ tr:last-child td {
   color: #1e293b;
 }
 
-/* Loading Container */
 .loading-container {
   display: flex;
   flex-direction: column;
@@ -3375,7 +3366,6 @@ tr:last-child td {
   font-size: 14px;
 }
 
-/* Error Container */
 .error-container {
   text-align: center;
   padding: 40px 20px;
@@ -3401,7 +3391,6 @@ tr:last-child td {
   background: #2563eb;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .actions-bar {
     flex-direction: column;
@@ -3630,7 +3619,6 @@ tr:last-child td {
   margin: 0;
 }
 
-/* User Info */
 .user-info {
   display: flex;
   align-items: center;
@@ -3650,7 +3638,6 @@ tr:last-child td {
   color: #fff;
 }
 
-/* Role Badges */
 .role-badge {
   padding: 4px 10px;
   border-radius: 6px;
@@ -3732,7 +3719,6 @@ tr:last-child td {
   color: #64748b;
 }
 
-/* Activity List */
 .activity-list {
   display: flex;
   flex-direction: column;
@@ -3808,7 +3794,6 @@ tr:last-child td {
   color: #cbd5e1;
 }
 
-/* History Timeline */
 .history-timeline {
   display: flex;
   flex-direction: column;
@@ -3876,7 +3861,6 @@ tr:last-child td {
   color: #64748b;
 }
 
-/* Pagination */
 .pagination {
   display: flex;
   justify-content: center;
@@ -3918,7 +3902,6 @@ tr:last-child td {
    CLIENT DETAIL - PÁGINA DE DETALHES DO CLIENTE
    ============================================ */
 
-/* Breadcrumb */
 .breadcrumb {
   display: flex;
   align-items: center;
@@ -3948,7 +3931,6 @@ tr:last-child td {
   cursor: default;
 }
 
-/* Cliente Header */
 .client-header {
   background: #ffffff;
   padding: 24px;
@@ -3980,7 +3962,6 @@ tr:last-child td {
   font-weight: 600;
 }
 
-/* Services Section */
 .services-section {
   background: #ffffff;
   padding: 24px;
@@ -4029,7 +4010,6 @@ tr:last-child td {
   color: #64748b;
 }
 
-/* Contracts Section */
 .contracts-section {
   background: #ffffff;
   padding: 24px;
@@ -4043,7 +4023,6 @@ tr:last-child td {
   color: #64748b;
 }
 
-/* Clickable Row */
 .clickable-row {
   cursor: pointer;
   transition: background 0.2s;
