@@ -1,6 +1,5 @@
 const pool = require('../config/db');
 
-// READ - Listar serviços por cliente (agrupado de fines)
 const getServicesByClient = async (client_id, tenant_id) => {
   const result = await pool.query(
     `SELECT 
@@ -23,21 +22,15 @@ const getServicesByClient = async (client_id, tenant_id) => {
   return result.rows;
 };
 
-// READ - Buscar serviço por ID (service_type_id)
 const getServiceById = async (id, tenant_id) => {
   const result = await pool.query(
-    `SELECT 
-      st.id::text AS id,
-      st.code AS name,
-      st.label
-     FROM service_types st
-     WHERE st.id = $1`,
+    `SELECT st.id::text AS id, st.code AS name, st.label
+     FROM service_types st WHERE st.id = $1`,
     [id]
   );
   return result.rows[0];
 };
 
-// READ - Listar todos os serviços do tenant
 const getAllServices = async (tenant_id) => {
   const result = await pool.query(
     `SELECT 
@@ -59,17 +52,21 @@ const getAllServices = async (tenant_id) => {
   return result.rows;
 };
 
-// CREATE - Não aplicável (fines são criadas diretamente)
 const createService = async ({ tenant_id, client_id, name }) => {
-  throw new Error('Use a rota de fines para criar registros');
+  const typeResult = await pool.query(
+    `SELECT id FROM service_types WHERE UPPER(code) = UPPER($1)`,
+    [name]
+  );
+  if (!typeResult.rows[0]) throw new Error(`Tipo de serviço "${name}" não encontrado`);
+  const service_type_id = typeResult.rows[0].id;
+  return { id: service_type_id.toString(), name, client_id, tenant_id };
 };
 
-// DELETE - Deletar todas as fines de um service_type para um cliente
-const deleteService = async (id, tenant_id) => {
+const deleteService = async (id, tenant_id, client_id) => {
   const result = await pool.query(
     `DELETE FROM fines 
-     WHERE service_type_id = $1 AND tenant_id = $2 RETURNING *`,
-    [id, tenant_id]
+     WHERE service_type_id = $1 AND tenant_id = $2 AND client_id = $3 RETURNING *`,
+    [id, tenant_id, client_id]
   );
   return result.rows[0];
 };
@@ -77,23 +74,15 @@ const deleteService = async (id, tenant_id) => {
 const countServicesByClient = async (client_id, tenant_id) => {
   const result = await pool.query(
     `SELECT COUNT(DISTINCT service_type_id) as total 
-     FROM fines 
-     WHERE client_id = $1 AND tenant_id = $2`,
+     FROM fines WHERE client_id = $1 AND tenant_id = $2`,
     [client_id, tenant_id]
   );
   return result.rows[0].total;
 };
 
-const updateService = async (id, { name }, tenant_id) => {
-  return null;
-};
+const updateService = async () => null;
 
 module.exports = {
-  createService,
-  getAllServices,
-  getServicesByClient,
-  getServiceById,
-  countServicesByClient,
-  updateService,
-  deleteService
+  createService, getAllServices, getServicesByClient, getServiceById,
+  countServicesByClient, updateService, deleteService
 };
