@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getClientById } from '../../../lib/clientsAPI';
 import { getServicesByClient, createService, deleteService } from '../../../lib/servicesAPI';
@@ -57,9 +57,9 @@ export default function ClientDetail() {
     numero_multa: '', vehicle_plate: '', process_number: '', organ: '', status: '',
   });
 
-  useEffect(() => { if (clientId) loadAll(); }, [clientId]);
-
-  const loadAll = async () => {
+  // useCallback garante que loadAll nÃ£o muda de referÃªncia a cada render
+  const loadAll = useCallback(async () => {
+    if (!clientId) return;
     try {
       setLoading(true);
       const [clientData, servicesData] = await Promise.all([
@@ -67,10 +67,11 @@ export default function ClientDetail() {
         getServicesByClient(clientId),
       ]);
       setClient(clientData);
-      setServices(servicesData || []);
+      const svcs = servicesData || [];
+      setServices(svcs);
 
       const entries = await Promise.all(
-        (servicesData || []).map(async (s) => {
+        svcs.map(async (s) => {
           try { return [s.id, await getContractsByService(s.id) || []]; }
           catch { return [s.id, []]; }
         })
@@ -81,22 +82,33 @@ export default function ClientDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientId]); // sÃ³ recria se clientId mudar
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]); // loadAll Ã© estÃ¡vel graÃ§as ao useCallback
 
   const handleCreateService = async (e) => {
     e.preventDefault();
+    if (!selectedServiceType) return;
     try {
       await createService({ client_id: clientId, name: selectedServiceType });
       setShowServiceModal(false);
       setSelectedServiceType('');
-      loadAll();
-    } catch (err) { setError(err.message); }
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleDeleteService = async (serviceId) => {
     if (!confirm('Excluir este servico e todos os seus contratos?')) return;
-    try { await deleteService(serviceId); loadAll(); }
-    catch (err) { setError(err.message); }
+    try {
+      await deleteService(serviceId);
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const openContractModal = (service, contract = null) => {
@@ -129,12 +141,17 @@ export default function ClientDetail() {
     }
 
     try {
-      if (editingContract) { await updateContract(editingContract.id, payload); }
-      else { await createContract(payload); }
+      if (editingContract) {
+        await updateContract(editingContract.id, payload);
+      } else {
+        await createContract(payload);
+      }
       setShowContractModal(false);
       const updated = await getContractsByService(selectedService.id);
       setContractsMap(prev => ({ ...prev, [selectedService.id]: updated || [] }));
-    } catch (err) { setError(err.message); }
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleDeleteContract = async (serviceId, contractId) => {
@@ -143,7 +160,9 @@ export default function ClientDetail() {
       await deleteContract(contractId);
       const updated = await getContractsByService(serviceId);
       setContractsMap(prev => ({ ...prev, [serviceId]: updated || [] }));
-    } catch (err) { setError(err.message); }
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   if (loading) return (
@@ -244,18 +263,17 @@ export default function ClientDetail() {
                   <table className="data-table" style={{ borderRadius: 0, border: 'none' }}>
                     <thead>
                       <tr>
-                        {name === 'multa'   && <><th>N Multa</th><th>Placa</th></>}
+                        {name === 'multa'    && <><th>N Multa</th><th>Placa</th></>}
                         {name === 'processo' && <><th>N Processo</th><th>Tipo</th></>}
                         {name !== 'multa' && name !== 'processo' && <th>Servico</th>}
                         <th>Andamento</th>
-                        <th>Data</th>
                         <th>Acoes</th>
                       </tr>
                     </thead>
                     <tbody>
                       {contracts.map((contract) => (
                         <tr key={contract.id}>
-                          {name === 'multa'   && <><td>{contract.numero_multa   || '-'}</td><td>{contract.vehicle_plate || '-'}</td></>}
+                          {name === 'multa'    && <><td>{contract.numero_multa   || '-'}</td><td>{contract.vehicle_plate || '-'}</td></>}
                           {name === 'processo' && <><td>{contract.process_number || '-'}</td><td>{contract.organ         || '-'}</td></>}
                           {name !== 'multa' && name !== 'processo' && <td>{service.name}</td>}
                           <td>
@@ -267,7 +285,6 @@ export default function ClientDetail() {
                               {contract.status || '-'}
                             </span>
                           </td>
-                          <td>{formatDate(contract.created_at)}</td>
                           <td>
                             <div className="actions-cell">
                               <button onClick={() => openContractModal(service, contract)} className="btn-icon" title="Editar">&#9999;</button>
