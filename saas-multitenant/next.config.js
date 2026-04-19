@@ -6,7 +6,7 @@ const nextConfig = {
     return [
       {
         source: '/api-backend/:path*',
-        destination: 'http://localhost:3000/:path*',
+        destination: 'https://chronostechcrm.onrender.com/:path*',
       },
     ];
   },
@@ -28,7 +28,6 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self'",
-              //Render
               "connect-src 'self' https://crm.chronostek.com.br https://chronostechcrm.onrender.com",
               "frame-ancestors 'none'",
               "object-src 'none'",
