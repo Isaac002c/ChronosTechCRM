@@ -1,13 +1,31 @@
- 'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { getClientById } from '../../../lib/clientsAPI';
-import { getFines, createFine, updateFine, deleteFine } from '../../../lib/finesAPI';
+import { getServicesByClient, createService, deleteService } from '../../../lib/servicesAPI';
+import { getContractsByService, createContract, updateContract, deleteContract } from '../../../lib/contractsAPI';
 
-const toInputDate = (value) => {
-  if (!value) return '';
-  return value.substring(0, 10);
+const SERVICE_TYPES = ['CRCI', 'MULTA', 'SUSPENSAO', 'CASSACAO', 'REVISAO DE ATOS', 'PROCESSO'];
+
+const MULTA_STATUSES = [
+  'APRS DEFESA PREVIA',
+  'DEFESA PREVIA - ANALISE',
+  'APRS 1 INSTANCIA',
+  '1 INSTANCIA - ANALISE',
+  'APRS 2 INSTANCIA',
+  '2 INSTANCIA - ANALISE',
+];
+
+const PROCESSO_TIPOS = ['DETRAN', 'DER', 'DNIT', 'SMTR', 'RENAINF', 'PMRJ', 'PREFEITURA UF'];
+
+const STATUS_COLORS = {
+  'APRS DEFESA PREVIA':      '#6366f1',
+  'DEFESA PREVIA - ANALISE': '#8b5cf6',
+  'APRS 1 INSTANCIA':        '#f59e0b',
+  '1 INSTANCIA - ANALISE':   '#f97316',
+  'APRS 2 INSTANCIA':        '#ef4444',
+  '2 INSTANCIA - ANALISE':   '#dc2626',
 };
 
 const formatDate = (value) => {
@@ -15,71 +33,49 @@ const formatDate = (value) => {
   return new Date(value).toLocaleDateString('pt-BR');
 };
 
-const formatCurrency = (value) => {
-  if (!value) return 'R$ 0,00';
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-};
+const formatCPF = (cpf) =>
+  cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/g, '$1.$2.$3-$4') : '-';
 
-const STATUS_LABELS = {
-  pendente: 'Pendente',
-  aguardando_documento: 'Aguard. Documento',
-  protocolado: 'Protocolado',
-  deferido: 'Deferido',
-  indeferido: 'Indeferido',
-  cancelado: 'Cancelado',
-};
-
-const STATUS_COLORS = {
-  pendente: '#f59e0b',
-  aguardando_documento: '#3b82f6',
-  protocolado: '#8b5cf6',
-  deferido: '#10b981',
-  indeferido: '#ef4444',
-  cancelado: '#6b7280',
-};
-
-const STAGE_LABELS = {
-  cadastro: 'Cadastro',
-  defesa_previa: 'Defesa PrÃ©via',
-  recurso_1: 'Recurso 1Âª',
-  recurso_2: 'Recurso 2Âª',
-  finalizado: 'Finalizado',
-};
-
-const EMPTY_FINE = {
-  fine_number: '', plate: '', organ: '', infraction_type: '',
-  vehicle_model: '', infraction_date: '', due_date: '', defense_date: '',
-  stage: 'cadastro', status: 'pendente', value: '', cost: '', paid_value: '',
-  seller_id: '', notes: '',
-};
-
-export default function ClientDetailPage() {
-  const { id } = useParams();
+export default function ClientDetail() {
   const router = useRouter();
+  const params = useParams();
+  const clientId = params?.id;
 
   const [client, setClient] = useState(null);
-  const [fines, setFines] = useState([]);
+  const [services, setServices] = useState([]);
+  const [contractsMap, setContractsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [showModal, setShowModal] = useState(false);
-  const [editingFine, setEditingFine] = useState(null);
-  const [formData, setFormData] = useState(EMPTY_FINE);
-  const [saving, setSaving] = useState(false);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [selectedServiceType, setSelectedServiceType] = useState('');
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  const [editingContract, setEditingContract] = useState(null);
+  const [contractForm, setContractForm] = useState({
+    numero_multa: '', vehicle_plate: '', process_number: '', organ: '', status: '',
+  });
 
-  const loadData = async () => {
+  useEffect(() => { if (clientId) loadAll(); }, [clientId]);
+
+  const loadAll = async () => {
     try {
       setLoading(true);
-      const [clientData, finesData] = await Promise.all([
-        getClientById(id),
-        getFines({ client_id: id }),
+      const [clientData, servicesData] = await Promise.all([
+        getClientById(clientId),
+        getServicesByClient(clientId),
       ]);
       setClient(clientData);
-      setFines(Array.isArray(finesData) ? finesData : []);
+      setServices(servicesData || []);
+
+      const entries = await Promise.all(
+        (servicesData || []).map(async (s) => {
+          try { return [s.id, await getContractsByService(s.id) || []]; }
+          catch { return [s.id, []]; }
+        })
+      );
+      setContractsMap(Object.fromEntries(entries));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -87,315 +83,298 @@ export default function ClientDetailPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleCreateService = async (e) => {
     e.preventDefault();
-    setSaving(true);
     try {
-      const payload = { ...formData, client_id: id };
-      if (editingFine) {
-        await updateFine(editingFine.id, payload);
-      } else {
-        await createFine(payload);
-      }
-      setShowModal(false);
-      setEditingFine(null);
-      setFormData(EMPTY_FINE);
-      await loadData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
+      await createService({ client_id: clientId, name: selectedServiceType });
+      setShowServiceModal(false);
+      setSelectedServiceType('');
+      loadAll();
+    } catch (err) { setError(err.message); }
+  };
+
+  const handleDeleteService = async (serviceId) => {
+    if (!confirm('Excluir este servico e todos os seus contratos?')) return;
+    try { await deleteService(serviceId); loadAll(); }
+    catch (err) { setError(err.message); }
+  };
+
+  const openContractModal = (service, contract = null) => {
+    setSelectedService(service);
+    setEditingContract(contract);
+    setContractForm(contract ? {
+      numero_multa:   contract.numero_multa   || '',
+      vehicle_plate:  contract.vehicle_plate  || '',
+      process_number: contract.process_number || '',
+      organ:          contract.organ          || '',
+      status:         contract.status         || '',
+    } : { numero_multa: '', vehicle_plate: '', process_number: '', organ: '', status: '' });
+    setShowContractModal(true);
+  };
+
+  const handleSaveContract = async (e) => {
+    e.preventDefault();
+    const name = selectedService.name?.toLowerCase() || '';
+    let payload = { service_id: selectedService.id, client_id: clientId };
+
+    if (name === 'multa') {
+      if (!contractForm.numero_multa || !contractForm.status) { setError('Preencha N da Multa e Status'); return; }
+      payload = { ...payload, numero_multa: contractForm.numero_multa, vehicle_plate: contractForm.vehicle_plate, status: contractForm.status, organ: contractForm.organ || 'DETRAN' };
+    } else if (name === 'processo') {
+      if (!contractForm.process_number || !contractForm.organ || !contractForm.status) { setError('Preencha N do Processo, Tipo e Status'); return; }
+      payload = { ...payload, process_number: contractForm.process_number, organ: contractForm.organ, status: contractForm.status };
+    } else {
+      if (!contractForm.status) { setError('Preencha o Status'); return; }
+      payload = { ...payload, status: contractForm.status };
     }
-  };
 
-  const handleEdit = (fine) => {
-    setEditingFine(fine);
-    setFormData({
-      fine_number:     fine.fine_number     || '',
-      plate:           fine.plate           || '',
-      organ:           fine.organ           || '',
-      infraction_type: fine.infraction_type || '',
-      vehicle_model:   fine.vehicle_model   || '',
-      infraction_date: toInputDate(fine.infraction_date),
-      due_date:        toInputDate(fine.due_date),
-      defense_date:    toInputDate(fine.defense_date),
-      stage:           fine.stage           || 'cadastro',
-      status:          fine.status          || 'pendente',
-      value:           fine.value           || '',
-      cost:            fine.cost            || '',
-      paid_value:      fine.paid_value      || '',
-      seller_id:       fine.seller_id       || '',
-      notes:           fine.notes           || '',
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (fineId) => {
-    if (!confirm('Deseja excluir esta multa?')) return;
     try {
-      await deleteFine(fineId);
-      await loadData();
-    } catch (err) {
-      setError(err.message);
-    }
+      if (editingContract) { await updateContract(editingContract.id, payload); }
+      else { await createContract(payload); }
+      setShowContractModal(false);
+      const updated = await getContractsByService(selectedService.id);
+      setContractsMap(prev => ({ ...prev, [selectedService.id]: updated || [] }));
+    } catch (err) { setError(err.message); }
   };
 
-  const openNewFineModal = () => {
-    setEditingFine(null);
-    setFormData(EMPTY_FINE);
-    setShowModal(true);
+  const handleDeleteContract = async (serviceId, contractId) => {
+    if (!confirm('Excluir este contrato?')) return;
+    try {
+      await deleteContract(contractId);
+      const updated = await getContractsByService(serviceId);
+      setContractsMap(prev => ({ ...prev, [serviceId]: updated || [] }));
+    } catch (err) { setError(err.message); }
   };
-
-  const Field = ({ label, value }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 500, color: '#111827' }}>{value || '-'}</span>
-    </div>
-  );
-
-  const Input = ({ label, ...props }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{label}</label>
-      <input
-        style={{
-          border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px',
-          fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box',
-          background: '#fff', color: '#111827',
-        }}
-        {...props}
-      />
-    </div>
-  );
-
-  const Select = ({ label, children, ...props }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{label}</label>
-      <select
-        style={{
-          border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px',
-          fontSize: 14, outline: 'none', width: '100%', boxSizing: 'border-box',
-          background: '#fff', color: '#111827',
-        }}
-        {...props}
-      >
-        {children}
-      </select>
-    </div>
-  );
-
-  const set = (field) => (e) => setFormData((f) => ({ ...f, [field]: e.target.value }));
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, flexDirection: 'column', gap: 12 }}>
-      <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <span style={{ color: '#6b7280', fontSize: 14 }}>Carregando...</span>
+    <div className="loading-container">
+      <div className="loading-spinner"></div>
+      <p>Carregando...</p>
     </div>
   );
 
   if (!client) return (
-    <div style={{ padding: 32, color: '#ef4444' }}>Cliente nÃ£o encontrado.</div>
+    <div className="error-container">
+      <p>Cliente nao encontrado</p>
+      <button onClick={() => router.back()} className="btn-retry">Voltar</button>
+    </div>
   );
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1100, margin: '0 auto' }}>
-
+    <div>
       {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 14, color: '#6b7280' }}>
-        <button
-          onClick={() => router.back()}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', fontSize: 14, padding: 0 }}
-        >
-          â† Voltar
+      <div className="breadcrumb">
+        <button onClick={() => router.back()} className="btn-secondary" style={{ padding: '8px 16px', fontSize: 13 }}>
+          &larr; Voltar
         </button>
-        <span>/</span>
-        <span style={{ color: '#111827', fontWeight: 500 }}>{client.name}</span>
+        <span className="separator">/</span>
+        <span className="current">{client.name}</span>
       </div>
 
-      {/* Header do cliente */}
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: '0 0 20px' }}>{client.name}</h1>
-
-      <div style={{
-        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
-        padding: '20px 24px', marginBottom: 28,
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 20,
-      }}>
-        <Field label="Data de Nasc." value={formatDate(client.birth_date)} />
-        <Field label="CPF" value={client.cpf} />
-        <Field label="CNH" value={client.cnh} />
-        <Field label="1Âª CNH" value={formatDate(client.first_cnh)} />
-        <Field label="Telefone" value={client.phone} />
-        <Field label="E-mail" value={client.email} />
-      </div>
-
-      {/* Erros */}
       {error && (
-        <div style={{
-          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
-          padding: '12px 16px', marginBottom: 16, display: 'flex',
-          justifyContent: 'space-between', alignItems: 'center', color: '#ef4444', fontSize: 14,
-        }}>
-          <span>{error}</span>
-          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 18, lineHeight: 1 }}>Ã—</button>
+        <div className="error-message" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ margin: 0 }}>{error}</p>
+          <button onClick={() => setError(null)} className="btn-close">x</button>
         </div>
       )}
 
-      {/* SeÃ§Ã£o de Multas */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 17, fontWeight: 600, color: '#111827', margin: 0 }}>Contratacoes</h2>
-        <button
-          onClick={openNewFineModal}
-          style={{
-            background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8,
-            padding: '8px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer',
-          }}
-        >
-          + Novo Servico
-        </button>
+      {/* Dados Pessoais */}
+      <div className="client-header">
+        <div className="client-info">
+          <h1>{client.name}</h1>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginTop: 16 }}>
+            {[
+              { label: 'Data de Nasc.', value: formatDate(client.birth_date) },
+              { label: 'CPF',           value: formatCPF(client.cpf) },
+              { label: 'CNH',           value: client.cnh || '-' },
+              { label: '1a CNH',        value: formatDate(client.first_cnh) },
+              { label: 'Telefone',      value: client.phone || '-' },
+              { label: 'E-mail',        value: client.email || '-' },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, display: 'block', marginBottom: 4 }}>{label}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{value}</span>
+              </div>
+            ))}
+            {client.address && (
+              <div style={{ gridColumn: '1/-1' }}>
+                <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, display: 'block', marginBottom: 4 }}>Endereco</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{client.address}</span>
+              </div>
+            )}
+            {client.notes && (
+              <div style={{ gridColumn: '1/-1' }}>
+                <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, display: 'block', marginBottom: 4 }}>Observacoes</span>
+                <span style={{ fontSize: 14, color: '#475569' }}>{client.notes}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
-        {fines.length === 0 ? (
-          <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
-            Nenhum servico contratado ainda.
-          </div>
+      {/* Contratacoes */}
+      <div className="contracts-section">
+        <div className="section-header">
+          <h3 style={{ margin: 0 }}>Contratacoes</h3>
+          <button onClick={() => setShowServiceModal(true)} className="btn-primary">+ Novo Servico</button>
+        </div>
+
+        {services.length === 0 ? (
+          <div className="no-data">Nenhum servico contratado ainda.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                {['Multa', 'Placa', 'Ã“rgÃ£o', 'Vencimento', 'EstÃ¡gio', 'Status', 'Valor', 'AÃ§Ãµes'].map((h) => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 500, color: '#6b7280', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {fines.map((fine, i) => (
-                <tr key={fine.id} style={{ borderBottom: i < fines.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                  <td style={{ padding: '12px 14px', fontWeight: 500 }}>{fine.fine_number || '-'}</td>
-                  <td style={{ padding: '12px 14px' }}>{fine.plate || '-'}</td>
-                  <td style={{ padding: '12px 14px' }}>{fine.organ || '-'}</td>
-                  <td style={{ padding: '12px 14px' }}>{formatDate(fine.due_date)}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{ fontSize: 12, color: '#4b5563', background: '#f3f4f6', borderRadius: 4, padding: '2px 8px' }}>
-                      {STAGE_LABELS[fine.stage] || fine.stage || '-'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <span style={{
-                      fontSize: 12, fontWeight: 500, borderRadius: 4, padding: '2px 8px',
-                      color: '#fff', background: STATUS_COLORS[fine.status] || '#6b7280',
-                    }}>
-                      {STATUS_LABELS[fine.status] || fine.status || '-'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 14px' }}>{formatCurrency(fine.value)}</td>
-                  <td style={{ padding: '12px 14px' }}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        onClick={() => handleEdit(fine)}
-                        style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#1d4ed8' }}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(fine.id)}
-                        style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 5, padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#b91c1c' }}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          services.map((service) => {
+            const contracts = contractsMap[service.id] || [];
+            const name = service.name?.toLowerCase();
+            return (
+              <div key={service.id} style={{ marginTop: 16, border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ background: '#3b82f6', color: '#fff', padding: '4px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600 }}>{service.name}</span>
+                    <span style={{ fontSize: 13, color: '#64748b' }}>{contracts.length} contrato{contracts.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => openContractModal(service)} className="btn-primary" style={{ padding: '6px 14px', fontSize: 13 }}>+ Adicionar</button>
+                    <button onClick={() => handleDeleteService(service.id)} className="btn-secondary btn-danger" style={{ padding: '6px 14px', fontSize: 13 }}>Excluir</button>
+                  </div>
+                </div>
+
+                {contracts.length === 0 ? (
+                  <div style={{ padding: 16, color: '#94a3b8', fontSize: 14 }}>Nenhum contrato neste servico.</div>
+                ) : (
+                  <table className="data-table" style={{ borderRadius: 0, border: 'none' }}>
+                    <thead>
+                      <tr>
+                        {name === 'multa'   && <><th>N Multa</th><th>Placa</th></>}
+                        {name === 'processo' && <><th>N Processo</th><th>Tipo</th></>}
+                        {name !== 'multa' && name !== 'processo' && <th>Servico</th>}
+                        <th>Andamento</th>
+                        <th>Data</th>
+                        <th>Acoes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contracts.map((contract) => (
+                        <tr key={contract.id}>
+                          {name === 'multa'   && <><td>{contract.numero_multa   || '-'}</td><td>{contract.vehicle_plate || '-'}</td></>}
+                          {name === 'processo' && <><td>{contract.process_number || '-'}</td><td>{contract.organ         || '-'}</td></>}
+                          {name !== 'multa' && name !== 'processo' && <td>{service.name}</td>}
+                          <td>
+                            <span className="status-badge" style={{
+                              background: STATUS_COLORS[contract.status] ? `${STATUS_COLORS[contract.status]}20` : '#f1f5f9',
+                              color: STATUS_COLORS[contract.status] || '#475569',
+                              fontSize: 11,
+                            }}>
+                              {contract.status || '-'}
+                            </span>
+                          </td>
+                          <td>{formatDate(contract.created_at)}</td>
+                          <td>
+                            <div className="actions-cell">
+                              <button onClick={() => openContractModal(service, contract)} className="btn-icon" title="Editar">&#9999;</button>
+                              <button onClick={() => handleDeleteContract(service.id, contract.id)} className="btn-icon danger" title="Excluir">&#128465;</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div
-          onClick={() => setShowModal(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#fff', borderRadius: 12, width: '100%', maxWidth: 620,
-              maxHeight: '90vh', overflow: 'auto', padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{editingFine ? 'Editar Multa' : 'Nova Multa'}</h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280' }}>Ã—</button>
+      {/* Modal Novo Servico */}
+      {showServiceModal && (
+        <div className="modal-overlay" onClick={() => setShowServiceModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Novo Servico</h2>
+              <button onClick={() => setShowServiceModal(false)} className="btn-close">x</button>
             </div>
+            <div className="modal-body">
+              <form onSubmit={handleCreateService}>
+                <div className="form-group">
+                  <label>Tipo de Servico *</label>
+                  <select value={selectedServiceType} onChange={(e) => setSelectedServiceType(e.target.value)} required>
+                    <option value="">Selecione...</option>
+                    {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="form-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setShowServiceModal(false)}>Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={!selectedServiceType}>Criar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-                <Input label="NÃºmero da Multa" value={formData.fine_number} onChange={set('fine_number')} />
-                <Input label="Placa" value={formData.plate} onChange={set('plate')} />
-                <Input label="Ã“rgÃ£o *" value={formData.organ} onChange={set('organ')} required />
-                <Input label="Tipo de InfraÃ§Ã£o" value={formData.infraction_type} onChange={set('infraction_type')} />
-                <Input label="Modelo do VeÃ­culo" value={formData.vehicle_model} onChange={set('vehicle_model')} />
-                <Input label="Data da InfraÃ§Ã£o" type="date" value={formData.infraction_date} onChange={set('infraction_date')} />
-                <Input label="Vencimento" type="date" value={formData.due_date} onChange={set('due_date')} />
-                <Input label="Prazo de Defesa" type="date" value={formData.defense_date} onChange={set('defense_date')} />
-                <Select label="EstÃ¡gio" value={formData.stage} onChange={set('stage')}>
-                  <option value="cadastro">Cadastro</option>
-                  <option value="defesa_previa">Defesa PrÃ©via</option>
-                  <option value="recurso_1">Recurso 1Âª InstÃ¢ncia</option>
-                  <option value="recurso_2">Recurso 2Âª InstÃ¢ncia</option>
-                  <option value="finalizado">Finalizado</option>
-                </Select>
-                <Select label="Status" value={formData.status} onChange={set('status')}>
-                  <option value="pendente">Pendente</option>
-                  <option value="aguardando_documento">Aguardando Documento</option>
-                  <option value="protocolado">Protocolado</option>
-                  <option value="deferido">Deferido</option>
-                  <option value="indeferido">Indeferido</option>
-                  <option value="cancelado">Cancelado</option>
-                </Select>
-                <Input label="Valor (R$)" type="number" step="0.01" value={formData.value} onChange={set('value')} />
-                <Input label="Custo (R$)" type="number" step="0.01" value={formData.cost} onChange={set('cost')} />
-                <Input label="Valor Pago (R$)" type="number" step="0.01" value={formData.paid_value} onChange={set('paid_value')} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, color: '#374151', fontWeight: 500, display: 'block', marginBottom: 4 }}>ObservaÃ§Ãµes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={set('notes')}
-                  rows={3}
-                  style={{
-                    border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px',
-                    fontSize: 14, width: '100%', boxSizing: 'border-box',
-                    resize: 'vertical', fontFamily: 'inherit', color: '#111827',
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  style={{
-                    padding: '8px 18px', background: saving ? '#93c5fd' : '#3b82f6',
-                    color: '#fff', border: 'none', borderRadius: 8, fontSize: 14,
-                    fontWeight: 500, cursor: saving ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {saving ? 'Salvando...' : (editingFine ? 'Salvar' : 'Criar')}
-                </button>
-              </div>
-            </form>
+      {/* Modal Contrato */}
+      {showContractModal && selectedService && (
+        <div className="modal-overlay" onClick={() => setShowContractModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingContract ? 'Editar' : 'Novo'} - {selectedService.name}</h2>
+              <button onClick={() => setShowContractModal(false)} className="btn-close">x</button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleSaveContract}>
+                {(() => {
+                  const name = selectedService.name?.toLowerCase();
+                  if (name === 'multa') return (
+                    <>
+                      <div className="form-group">
+                        <label>N da Multa *</label>
+                        <input value={contractForm.numero_multa} onChange={e => setContractForm({...contractForm, numero_multa: e.target.value})} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Placa</label>
+                        <input value={contractForm.vehicle_plate} onChange={e => setContractForm({...contractForm, vehicle_plate: e.target.value})} />
+                      </div>
+                      <div className="form-group">
+                        <label>Andamento *</label>
+                        <select value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required>
+                          <option value="">Selecione...</option>
+                          {MULTA_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </>
+                  );
+                  if (name === 'processo') return (
+                    <>
+                      <div className="form-group">
+                        <label>N do Processo *</label>
+                        <input value={contractForm.process_number} onChange={e => setContractForm({...contractForm, process_number: e.target.value})} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Tipo *</label>
+                        <select value={contractForm.organ} onChange={e => setContractForm({...contractForm, organ: e.target.value})} required>
+                          <option value="">Selecione...</option>
+                          {PROCESSO_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Andamento *</label>
+                        <input value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required />
+                      </div>
+                    </>
+                  );
+                  return (
+                    <div className="form-group">
+                      <label>Andamento *</label>
+                      <input value={contractForm.status} onChange={e => setContractForm({...contractForm, status: e.target.value})} required />
+                    </div>
+                  );
+                })()}
+                <div className="form-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setShowContractModal(false)}>Cancelar</button>
+                  <button type="submit" className="btn-primary">{editingContract ? 'Salvar' : 'Criar'}</button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
