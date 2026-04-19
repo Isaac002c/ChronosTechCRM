@@ -3,8 +3,6 @@ const router = express.Router();
 const contractModel = require('../models/contractModels');
 const { checkPermission } = require('../middlewares/checkPermission');
 
-// ── rotas fixas ANTES de /:id ──
-
 router.get('/aprs-stats', checkPermission('contracts:read'), async (req, res) => {
   try {
     const stats = await contractModel.getAPRsByStage(req.tenantId);
@@ -46,7 +44,11 @@ router.get('/client/:clientId', checkPermission('contracts:read'), async (req, r
 
 router.get('/service/:serviceId', checkPermission('contracts:read'), async (req, res) => {
   try {
-    const contracts = await contractModel.getContractsByService(req.params.serviceId, req.tenantId);
+    const contracts = await contractModel.getContractsByService(
+      req.params.serviceId,
+      req.tenantId,
+      req.query.client_id || null
+    );
     res.json({ success: true, data: contracts });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -91,7 +93,6 @@ router.delete('/:id', checkPermission('contracts:delete'), async (req, res) => {
   }
 });
 
-// ── /:id SEMPRE POR ÚLTIMO ──
 router.get('/:id', checkPermission('contracts:read'), async (req, res) => {
   try {
     const contract = await contractModel.getContractById(req.params.id, req.tenantId);
